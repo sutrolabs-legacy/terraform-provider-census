@@ -616,11 +616,6 @@ func resourceSyncCreate(ctx context.Context, d *schema.ResourceData, meta interf
 	destinationAttributes := ExpandDestinationAttributes(d.Get("destination_attributes").([]interface{}))
 	fieldMappings := ExpandFieldMappings(d.Get("field_mapping").([]interface{}))
 
-	// Validate exactly one primary identifier
-	if err := validatePrimaryIdentifier(fieldMappings); err != nil {
-		return diag.FromErr(err)
-	}
-
 	// Get operation from top-level field (per OpenAPI spec)
 	operation := d.Get("operation").(string)
 
@@ -1832,25 +1827,6 @@ func convertToString(value interface{}) string {
 	default:
 		return fmt.Sprintf("%v", v)
 	}
-}
-
-// validatePrimaryIdentifier ensures exactly one field mapping has is_primary_identifier = true
-func validatePrimaryIdentifier(fieldMappings []client.FieldMapping) error {
-	primaryCount := 0
-	for _, fm := range fieldMappings {
-		if fm.IsPrimaryIdentifier {
-			primaryCount++
-		}
-	}
-
-	if primaryCount == 0 {
-		return fmt.Errorf("exactly one field_mapping must have is_primary_identifier = true, but found 0")
-	}
-	if primaryCount > 1 {
-		return fmt.Errorf("exactly one field_mapping must have is_primary_identifier = true, but found %d", primaryCount)
-	}
-
-	return nil
 }
 
 // convertFieldMappingsToMappingAttributes converts Terraform FieldMapping to Census API MappingAttributes
