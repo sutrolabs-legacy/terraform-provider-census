@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 - Remove client-side validation for primary identifiers in sync resources. The Census API now handles this validation, fixing issues with certain destination types like Google Sheets that don't require explicit primary identifier mappings. ([#1](https://github.com/sutrolabs/terraform-provider-census/issues/1))
+- Fix sync `paused` attribute not updating correctly when changing from `true` to `false`. Removed `omitempty` JSON tag from boolean field to ensure the value is always sent to the API.
 
 ## [0.2.0] - 2025-10-23 - Initial Public Release
 

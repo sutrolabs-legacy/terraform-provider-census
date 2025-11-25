@@ -576,3 +576,141 @@ func TestCleanEmptyStrings(t *testing.T) {
 		})
 	}
 }
+
+// ============================================================================
+// Primary Identifier Validation Tests
+// ============================================================================
+// These tests verify that client-side validation of primary identifiers has been removed.
+// The Census API now handles primary identifier validation, allowing destinations like
+// Google Sheets that don't require explicit primary identifiers.
+
+func TestExpandFieldMappings_NoPrimaryIdentifier(t *testing.T) {
+	tests := []struct {
+		name     string
+		input    []interface{}
+		expected []client.FieldMapping
+	}{
+		{
+			name: "mappings without primary identifier - allowed for destinations like Google Sheets",
+			input: []interface{}{
+				map[string]interface{}{
+					"from": "city",
+					"to":   "City",
+					"type": "direct",
+				},
+				map[string]interface{}{
+					"from": "state",
+					"to":   "State",
+					"type": "direct",
+				},
+			},
+			expected: []client.FieldMapping{
+				{
+					From:                "city",
+					To:                  "City",
+					Type:                "direct",
+					IsPrimaryIdentifier: false,
+				},
+				{
+					From:                "state",
+					To:                  "State",
+					Type:                "direct",
+					IsPrimaryIdentifier: false,
+				},
+			},
+		},
+		{
+			name: "single mapping without primary identifier",
+			input: []interface{}{
+				map[string]interface{}{
+					"from": "email",
+					"to":   "Email",
+				},
+			},
+			expected: []client.FieldMapping{
+				{
+					From:                "email",
+					To:                  "Email",
+					Type:                "direct",
+					IsPrimaryIdentifier: false,
+				},
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := provider.ExpandFieldMappings(tt.input)
+			if !reflect.DeepEqual(result, tt.expected) {
+				t.Errorf("ExpandFieldMappings() got = %+v, want %+v", result, tt.expected)
+			}
+		})
+	}
+}
+
+func TestExpandFieldMappings_GoogleSheetsScenario(t *testing.T) {
+	// Google Sheets syncs don't require primary identifiers
+	// This test verifies that field mappings work correctly for such destinations
+	tests := []struct {
+		name     string
+		input    []interface{}
+		expected int // Expected number of mappings
+	}{
+		{
+			name: "Google Sheets sync with replace operation - no primary identifier needed",
+			input: []interface{}{
+				map[string]interface{}{
+					"from": "city",
+					"to":   "City",
+				},
+				map[string]interface{}{
+					"from": "state",
+					"to":   "State",
+				},
+				map[string]interface{}{
+					"from": "population",
+					"to":   "Population",
+				},
+			},
+			expected: 3,
+		},
+		{
+			name: "Google Sheets sync with constant values - no primary identifier",
+			input: []interface{}{
+				map[string]interface{}{
+					"from": "name",
+					"to":   "Name",
+				},
+				map[string]interface{}{
+					"type":     "constant",
+					"constant": "2024",
+					"to":       "Year",
+				},
+			},
+			expected: 2,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := provider.ExpandFieldMappings(tt.input)
+			if len(result) != tt.expected {
+				t.Errorf("ExpandFieldMappings() returned %d mappings, want %d", len(result), tt.expected)
+			}
+
+			// Verify all mappings are properly expanded
+			for i, mapping := range result {
+				if mapping.To == "" {
+					t.Errorf("ExpandFieldMappings() mapping %d has empty 'to' field", i)
+				}
+			}
+
+			// Verify no primary identifiers are set
+			for i, mapping := range result {
+				if mapping.IsPrimaryIdentifier {
+					t.Errorf("ExpandFieldMappings() mapping %d unexpectedly has IsPrimaryIdentifier=true", i)
+				}
+			}
+		})
+	}
+}
