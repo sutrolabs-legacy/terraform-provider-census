@@ -193,7 +193,7 @@ type CreateSyncRequest struct {
 	// Mode - live vs triggered with trigger configurations (replaces schedule fields)
 	Mode *SyncMode `json:"mode,omitempty"`
 
-	Paused bool `json:"paused,omitempty"`
+	Paused bool `json:"paused"`
 
 	// Field configuration
 	FieldBehavior      string `json:"field_behavior,omitempty"`      // sync_all_properties or specific_properties
@@ -235,7 +235,7 @@ type UpdateSyncRequest struct {
 	// Mode - live vs triggered with trigger configurations (replaces schedule fields)
 	Mode *SyncMode `json:"mode,omitempty"`
 
-	Paused bool `json:"paused,omitempty"`
+	Paused bool `json:"paused"`
 
 	// Field configuration
 	FieldBehavior      string `json:"field_behavior,omitempty"`      // sync_all_properties or specific_properties
