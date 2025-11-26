@@ -331,6 +331,7 @@ func resourceSync() *schema.Resource {
 			"alert": {
 				Type:        schema.TypeSet,
 				Optional:    true,
+				Computed:    true,
 				Description: "Alert configurations for the sync. Multiple alerts of different types can be configured.",
 				Elem: &schema.Resource{
 					Schema: map[string]*schema.Schema{
@@ -383,6 +384,7 @@ func resourceSync() *schema.Resource {
 			"run_mode": {
 				Type:        schema.TypeList,
 				Optional:    true,
+				Computed:    true,
 				MaxItems:    1,
 				Description: "Run mode configuration for the sync (live vs triggered with various trigger types).",
 				Elem: &schema.Resource{
