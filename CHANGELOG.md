@@ -5,6 +5,11 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Fixed
+- Fix Snowflake source validation to support keypair authentication. The provider now correctly handles `show.unless` conditions in field metadata, allowing sources to be created with `use_keypair=true` without requiring a password field.
+
 ## [0.2.1] - 2025-11-25
 
 ### Fixed

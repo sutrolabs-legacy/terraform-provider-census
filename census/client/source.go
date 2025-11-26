@@ -415,6 +415,62 @@ func (c *Client) ValidateSourceCredentials(ctx context.Context, sourceType strin
 							isRequired = false
 						}
 					}
+				} else if unlessField, exists := showMap["unless"]; exists {
+					// Handle "unless" conditions: field is required UNLESS condition is true
+					// Example: "show": {"unless": {"use_keypair": {"eq": true}}}
+					conditionMet := false
+
+					if unlessFieldMap, ok := unlessField.(map[string]interface{}); ok {
+						for conditionField, expectedValue := range unlessFieldMap {
+							if conditionValue, conditionExists := credentials[conditionField]; conditionExists {
+								// Check if condition matches expected value
+								if expectedMap, ok := expectedValue.(map[string]interface{}); ok {
+									if eqValue, hasEq := expectedMap["eq"]; hasEq {
+										// Handle {"eq": value} comparisons
+										if expectedBool, ok := eqValue.(bool); ok {
+											// Expected value is boolean
+											if condBool, ok := conditionValue.(bool); ok {
+												if condBool == expectedBool {
+													conditionMet = true
+												}
+											} else if condStr, ok := conditionValue.(string); ok {
+												// Convert string to boolean for comparison
+												condBool := condStr == "true" || condStr == "1"
+												if condBool == expectedBool {
+													conditionMet = true
+												}
+											}
+										} else if expectedStr, ok := eqValue.(string); ok {
+											// Expected value is string
+											if condStr, ok := conditionValue.(string); ok {
+												if condStr == expectedStr {
+													conditionMet = true
+												}
+											}
+										}
+									}
+								} else if expectedBool, ok := expectedValue.(bool); ok {
+									// Simple boolean comparison without "eq" wrapper
+									if condBool, ok := conditionValue.(bool); ok {
+										if condBool == expectedBool {
+											conditionMet = true
+										}
+									} else if condStr, ok := conditionValue.(string); ok {
+										condBool := condStr == "true" || condStr == "1"
+										if condBool == expectedBool {
+											conditionMet = true
+										}
+									}
+								}
+							}
+							break // Handle first condition for now
+						}
+					}
+
+					// If "unless" condition is met, field is NOT required
+					if conditionMet {
+						isRequired = false
+					}
 				}
 			}
 		}

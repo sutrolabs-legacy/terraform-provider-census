@@ -4,7 +4,7 @@ Manages a Census data source connection. Sources connect to data warehouses like
 
 ## Example Usage
 
-### Snowflake Source
+### Snowflake Source (Password Authentication)
 
 ```hcl
 resource "census_source" "warehouse" {
@@ -19,6 +19,27 @@ resource "census_source" "warehouse" {
     username       = "census_user"
     password       = var.snowflake_password
     role           = "CENSUS_ROLE"
+  })
+}
+```
+
+### Snowflake Source (Keypair Authentication)
+
+```hcl
+resource "census_source" "warehouse_keypair" {
+  workspace_id = census_workspace.main.id
+  name         = "Production Warehouse (Keypair)"
+  type         = "snowflake"
+
+  connection_config = jsonencode({
+    account              = "abc12345.us-east-1"
+    warehouse            = "COMPUTE_WH"
+    database             = "PRODUCTION"
+    username             = "census_user"
+    role                 = "CENSUS_ROLE"
+    use_keypair          = true
+    private_key_pkcs8    = var.snowflake_private_key
+    private_key_passphrase = var.snowflake_key_passphrase  # Optional, omit if key is not encrypted
   })
 }
 ```
