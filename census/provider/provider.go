@@ -50,7 +50,7 @@ func Provider() *schema.Provider {
 			"census_workspace":   resourceWorkspace(),
 			"census_source":      resourceSource(),
 			"census_destination": resourceDestination(),
-			"census_sync":        resourceSync(),
+			"census_sync":        ResourceSync(),
 			"census_dataset":     resourceDataset(),
 		},
 		DataSourcesMap: map[string]*schema.Resource{
