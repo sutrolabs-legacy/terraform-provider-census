@@ -472,6 +472,7 @@ resource "census_sync" "marketing_contact_sync_3" {
 resource "census_sync" "dataset_contact_sync" {
   workspace_id = census_workspace.marketing_prod.id
   label        = "Dataset to Contacts Sync"
+  paused       = true
 
   # Source configuration - use a dataset instead of table
   source_attributes {
@@ -497,8 +498,8 @@ resource "census_sync" "dataset_contact_sync" {
   # Field mappings using dataset columns
 
   field_mapping {
-    from = "last_name"
-    to   = "LastName"
+    from = "first_name"
+    to   = "FirstName"
   }
 
   # Sync metadata mapping - track sync run IDs
@@ -508,6 +509,18 @@ resource "census_sync" "dataset_contact_sync" {
     to                = "another__c"
   }
 
+  # Liquid template transformation
+  field_mapping {
+    type            = "liquid_template"
+    liquid_template = "{{ record['_fivetran_synced'] | upcase }}"
+    to              = "OtherPostalCode"
+  }
+
+  field_mapping {
+    from = "last_name"
+    to   = "LastName"
+  }
+
   # Segment membership mapping
   field_mapping {
     type                = "segment_membership"
@@ -515,11 +528,10 @@ resource "census_sync" "dataset_contact_sync" {
     to                  = "MailingStreet"
   }
 
-  # Liquid template transformation
   field_mapping {
-    type            = "liquid_template"
-    liquid_template = "{{ record['_fivetran_synced'] | upcase }}"
-    to              = "OtherPostalCode"
+    from                  = "email"
+    to                    = "Email"
+    is_primary_identifier = true
   }
 
   field_mapping {
@@ -531,16 +543,6 @@ resource "census_sync" "dataset_contact_sync" {
     type     = "constant"
     constant = "HERE is my constant value"
     to       = "AssistantName"
-  }
-  field_mapping {
-    from                  = "email"
-    to                    = "Email"
-    is_primary_identifier = true
-  }
-
-  field_mapping {
-    from = "first_name"
-    to   = "FirstName"
   }
 
   # Run mode - triggered hourly at minute 10
