@@ -527,7 +527,8 @@ func syncSchemaMap(alertCollectionType schema.ValueType) map[string]*schema.Sche
 	}
 }
 
-func resourceSync() *schema.Resource {
+// ResourceSync returns the resource schema for a Census sync
+func ResourceSync() *schema.Resource {
 	return &schema.Resource{
 		Description: "Manages a Census data sync between a source and destination.",
 
@@ -543,8 +544,8 @@ func resourceSync() *schema.Resource {
 		SchemaVersion: 1,
 		StateUpgraders: []schema.StateUpgrader{
 			{
-				Type:    resourceSyncV0().CoreConfigSchema().ImpliedType(),
-				Upgrade: resourceSyncStateUpgradeV0,
+				Type:    ResourceSyncV0().CoreConfigSchema().ImpliedType(),
+				Upgrade: ResourceSyncStateUpgradeV0,
 				Version: 0,
 			},
 		},
@@ -553,16 +554,16 @@ func resourceSync() *schema.Resource {
 	}
 }
 
-// resourceSyncV0 returns the v0 schema (with TypeSet for alerts)
-func resourceSyncV0() *schema.Resource {
+// ResourceSyncV0 returns the v0 schema (with TypeSet for alerts)
+func ResourceSyncV0() *schema.Resource {
 	return &schema.Resource{
 		Schema: syncSchemaMap(schema.TypeSet),
 	}
 }
 
-// resourceSyncStateUpgradeV0 upgrades the state from v0 to v1
+// ResourceSyncStateUpgradeV0 upgrades the state from v0 to v1
 // Migrates alert field from TypeSet to TypeList
-func resourceSyncStateUpgradeV0(ctx context.Context, rawState map[string]interface{}, meta interface{}) (map[string]interface{}, error) {
+func ResourceSyncStateUpgradeV0(ctx context.Context, rawState map[string]interface{}, meta interface{}) (map[string]interface{}, error) {
 	// TypeSet and TypeList store data identically in JSON state (as arrays)
 	// No data transformation needed - just return state unchanged
 	// Terraform will re-interpret it with the new schema
