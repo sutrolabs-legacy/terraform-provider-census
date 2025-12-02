@@ -1268,11 +1268,11 @@ func ExpandAlerts(alerts []interface{}) []client.AlertAttribute {
 			Options: make(map[string]interface{}),
 		}
 
-		if alertType, ok := m["type"].(string); ok {
+		if alertType, ok := m["type"].(string); ok && alertType != "" {
 			alertAttr.Type = alertType
 		}
 
-		if sendFor, ok := m["send_for"].(string); ok {
+		if sendFor, ok := m["send_for"].(string); ok && sendFor != "" {
 			alertAttr.SendFor = sendFor
 		} else {
 			alertAttr.SendFor = "first_time" // default
@@ -1300,7 +1300,11 @@ func ExpandAlerts(alerts []interface{}) []client.AlertAttribute {
 			}
 		}
 
-		result = append(result, alertAttr)
+		// Only append if we have a valid alert type (required field)
+		// This prevents sending invalid empty alerts to the API
+		if alertAttr.Type != "" {
+			result = append(result, alertAttr)
+		}
 	}
 	return result
 }

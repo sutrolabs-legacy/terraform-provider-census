@@ -357,6 +357,88 @@ func TestExpandAlerts_Empty(t *testing.T) {
 	}
 }
 
+// TestExpandAlerts_EmptyStrings tests that alerts with empty string values
+// are properly skipped, preventing invalid API payloads (regression test)
+func TestExpandAlerts_EmptyStrings(t *testing.T) {
+	tests := []struct {
+		name     string
+		input    []interface{}
+		expected int
+		checkFn  func(*testing.T, []client.AlertAttribute)
+	}{
+		{
+			name: "alert with empty type is skipped",
+			input: []interface{}{
+				map[string]interface{}{
+					"type":                 "", // Empty string
+					"send_for":             "first_time",
+					"should_send_recovery": false,
+					"options":              map[string]interface{}{},
+				},
+			},
+			expected: 0, // Should be skipped
+		},
+		{
+			name: "alert with empty send_for uses default",
+			input: []interface{}{
+				map[string]interface{}{
+					"type":                 "FailureAlertConfiguration",
+					"send_for":             "", // Empty string should trigger default
+					"should_send_recovery": true,
+					"options":              map[string]interface{}{},
+				},
+			},
+			expected: 1,
+			checkFn: func(t *testing.T, alerts []client.AlertAttribute) {
+				if alerts[0].SendFor != "first_time" {
+					t.Errorf("Expected SendFor to be 'first_time' (default), got '%s'", alerts[0].SendFor)
+				}
+			},
+		},
+		{
+			name: "mixed valid and invalid alerts",
+			input: []interface{}{
+				map[string]interface{}{
+					"type":                 "", // Empty - should be skipped
+					"send_for":             "first_time",
+					"should_send_recovery": false,
+				},
+				map[string]interface{}{
+					"type":                 "FailureAlertConfiguration", // Valid
+					"send_for":             "every_time",
+					"should_send_recovery": true,
+				},
+				map[string]interface{}{
+					"type":                 "", // Empty - should be skipped
+					"send_for":             "",
+					"should_send_recovery": false,
+				},
+			},
+			expected: 1, // Only the valid alert should remain
+			checkFn: func(t *testing.T, alerts []client.AlertAttribute) {
+				if alerts[0].Type != "FailureAlertConfiguration" {
+					t.Errorf("Expected Type to be 'FailureAlertConfiguration', got '%s'", alerts[0].Type)
+				}
+				if alerts[0].SendFor != "every_time" {
+					t.Errorf("Expected SendFor to be 'every_time', got '%s'", alerts[0].SendFor)
+				}
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := provider.ExpandAlerts(tt.input)
+			if len(result) != tt.expected {
+				t.Errorf("ExpandAlerts() returned %d items, want %d", len(result), tt.expected)
+			}
+			if tt.checkFn != nil {
+				tt.checkFn(t, result)
+			}
+		})
+	}
+}
+
 // ============================================================================
 // Schedule Tests
 // ============================================================================
