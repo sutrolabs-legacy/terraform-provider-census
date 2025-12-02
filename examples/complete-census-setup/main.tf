@@ -471,7 +471,7 @@ resource "census_sync" "marketing_contact_sync_3" {
 # Sync using a dataset as the source
 resource "census_sync" "dataset_contact_sync" {
   workspace_id = census_workspace.marketing_prod.id
-  label        = "Dataset to Contacts Sync"
+  label        = "Dataset to Contacts Syncer"
   paused       = true
 
   # Source configuration - use a dataset instead of table
@@ -495,21 +495,17 @@ resource "census_sync" "dataset_contact_sync" {
     bulk_id_lookup = true
   })
 
-  # Field mappings using dataset columns
-
-  field_mapping {
-    from = "first_name"
-    to   = "FirstName"
-  }
-
-  # Sync metadata mapping - track sync run IDs
   field_mapping {
     type              = "sync_metadata"
     sync_metadata_key = "sync_run_id"
     to                = "another__c"
   }
 
-  # Liquid template transformation
+  field_mapping {
+    from = "first_name"
+    to   = "FirstName"
+  }
+
   field_mapping {
     type            = "liquid_template"
     liquid_template = "{{ record['_fivetran_synced'] | upcase }}"
@@ -521,7 +517,6 @@ resource "census_sync" "dataset_contact_sync" {
     to   = "LastName"
   }
 
-  # Segment membership mapping
   field_mapping {
     type                = "segment_membership"
     segment_identify_by = "name"
@@ -545,6 +540,12 @@ resource "census_sync" "dataset_contact_sync" {
     to       = "AssistantName"
   }
 
+  field_mapping {
+    type     = "constant"
+    constant = "HERE is my constant value 2"
+    to       = "Title"
+  }
+
   # Run mode - triggered hourly at minute 10
   run_mode {
     type = "triggered"
@@ -565,15 +566,6 @@ resource "census_sync" "dataset_contact_sync" {
   }
 
   alert {
-    type                 = "InvalidRecordPercentAlertConfiguration"
-    send_for             = "first_time"
-    should_send_recovery = true
-    options = {
-      threshold = "75"
-    }
-  }
-
-  alert {
     type                 = "RuntimeAlertConfiguration"
     send_for             = "first_time"
     should_send_recovery = false
@@ -581,6 +573,15 @@ resource "census_sync" "dataset_contact_sync" {
       threshold  = "45"
       unit       = "minutes"
       start_type = "actual"
+    }
+  }
+
+  alert {
+    type                 = "InvalidRecordPercentAlertConfiguration"
+    send_for             = "first_time"
+    should_send_recovery = true
+    options = {
+      threshold = "75"
     }
   }
 

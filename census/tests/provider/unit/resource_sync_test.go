@@ -933,3 +933,480 @@ func TestResourceSyncV1SchemaCompatibility(t *testing.T) {
 	// Note: Type is a cty.Type struct (not a pointer), so we can't check for nil
 	// The existence of the StateUpgrader itself confirms it's properly configured
 }
+
+// ============================================================================
+// Mapping Conversion Tests (FieldMapping → MappingAttributes)
+// ============================================================================
+
+func TestConvertFieldMappingsToMappingAttributes_Constant(t *testing.T) {
+	tests := []struct {
+		name     string
+		input    []client.FieldMapping
+		expected []client.MappingAttributes
+	}{
+		{
+			name: "single constant string mapping",
+			input: []client.FieldMapping{
+				{
+					To:       "Source",
+					Type:     "constant",
+					Constant: "Website",
+				},
+			},
+			expected: []client.MappingAttributes{
+				{
+					From: client.MappingFrom{
+						Type: "constant_value",
+						Data: map[string]interface{}{
+							"basic_type": "text",
+							"value":      "Website",
+						},
+					},
+					To:                  "Source",
+					IsPrimaryIdentifier: false,
+				},
+			},
+		},
+		{
+			name: "multiple constant mappings with different to fields",
+			input: []client.FieldMapping{
+				{
+					To:       "AssistantName",
+					Type:     "constant",
+					Constant: "HERE is my constant value",
+				},
+				{
+					To:       "Title",
+					Type:     "constant",
+					Constant: "HERE is my constant value 2",
+				},
+			},
+			expected: []client.MappingAttributes{
+				{
+					From: client.MappingFrom{
+						Type: "constant_value",
+						Data: map[string]interface{}{
+							"basic_type": "text",
+							"value":      "HERE is my constant value",
+						},
+					},
+					To:                  "AssistantName",
+					IsPrimaryIdentifier: false,
+				},
+				{
+					From: client.MappingFrom{
+						Type: "constant_value",
+						Data: map[string]interface{}{
+							"basic_type": "text",
+							"value":      "HERE is my constant value 2",
+						},
+					},
+					To:                  "Title",
+					IsPrimaryIdentifier: false,
+				},
+			},
+		},
+		{
+			name: "constant numeric value",
+			input: []client.FieldMapping{
+				{
+					To:       "Priority",
+					Type:     "constant",
+					Constant: 1,
+				},
+			},
+			expected: []client.MappingAttributes{
+				{
+					From: client.MappingFrom{
+						Type: "constant_value",
+						Data: map[string]interface{}{
+							"basic_type": "text",
+							"value":      "1",
+						},
+					},
+					To:                  "Priority",
+					IsPrimaryIdentifier: false,
+				},
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := provider.ConvertFieldMappingsToMappingAttributes(tt.input)
+			if !reflect.DeepEqual(result, tt.expected) {
+				t.Errorf("convertFieldMappingsToMappingAttributes() got = %+v, want %+v", result, tt.expected)
+			}
+		})
+	}
+}
+
+func TestConvertFieldMappingsToMappingAttributes_Direct(t *testing.T) {
+	tests := []struct {
+		name     string
+		input    []client.FieldMapping
+		expected []client.MappingAttributes
+	}{
+		{
+			name: "direct mapping",
+			input: []client.FieldMapping{
+				{
+					From: "user_id",
+					To:   "UserID",
+					Type: "direct",
+				},
+			},
+			expected: []client.MappingAttributes{
+				{
+					From: client.MappingFrom{
+						Type: "column",
+						Data: "user_id", // Census API expects just the column name as string
+					},
+					To:                  "UserID",
+					IsPrimaryIdentifier: false,
+				},
+			},
+		},
+		{
+			name: "direct mapping with primary identifier",
+			input: []client.FieldMapping{
+				{
+					From:                "user_id",
+					To:                  "UserID",
+					Type:                "direct",
+					IsPrimaryIdentifier: true,
+				},
+			},
+			expected: []client.MappingAttributes{
+				{
+					From: client.MappingFrom{
+						Type: "column",
+						Data: "user_id", // Census API expects just the column name as string
+					},
+					To:                  "UserID",
+					IsPrimaryIdentifier: true,
+				},
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := provider.ConvertFieldMappingsToMappingAttributes(tt.input)
+			if !reflect.DeepEqual(result, tt.expected) {
+				t.Errorf("convertFieldMappingsToMappingAttributes() got = %+v, want %+v", result, tt.expected)
+			}
+		})
+	}
+}
+
+func TestConvertFieldMappingsToMappingAttributes_Mixed(t *testing.T) {
+	// Test a realistic scenario with multiple mapping types
+	input := []client.FieldMapping{
+		{
+			From:                "user_id",
+			To:                  "UserID",
+			Type:                "direct",
+			IsPrimaryIdentifier: true,
+		},
+		{
+			From: "email",
+			To:   "Email",
+			Type: "direct",
+		},
+		{
+			To:       "Source",
+			Type:     "constant",
+			Constant: "Website",
+		},
+		{
+			To:              "SyncTime",
+			Type:            "sync_metadata",
+			SyncMetadataKey: "sync_run_id",
+		},
+	}
+
+	expected := []client.MappingAttributes{
+		{
+			From: client.MappingFrom{
+				Type: "column",
+				Data: "user_id", // Census API expects string for column
+			},
+			To:                  "UserID",
+			IsPrimaryIdentifier: true,
+		},
+		{
+			From: client.MappingFrom{
+				Type: "column",
+				Data: "email", // Census API expects string for column
+			},
+			To:                  "Email",
+			IsPrimaryIdentifier: false,
+		},
+		{
+			From: client.MappingFrom{
+				Type: "constant_value",
+				Data: map[string]interface{}{
+					"basic_type": "text",
+					"value":      "Website",
+				},
+			},
+			To:                  "Source",
+			IsPrimaryIdentifier: false,
+		},
+		{
+			From: client.MappingFrom{
+				Type: "sync_metadata",
+				Data: "sync_run_id", // Census API expects string for sync_metadata
+			},
+			To:                  "SyncTime",
+			IsPrimaryIdentifier: false,
+		},
+	}
+
+	result := provider.ConvertFieldMappingsToMappingAttributes(input)
+	if !reflect.DeepEqual(result, expected) {
+		t.Errorf("convertFieldMappingsToMappingAttributes() got = %+v, want %+v", result, expected)
+	}
+}
+
+func TestConvertFieldMappingsToMappingAttributes_LiquidTemplate(t *testing.T) {
+	// Test liquid template format
+	input := []client.FieldMapping{
+		{
+			To:             "FormattedDate",
+			Type:           "liquid_template",
+			LiquidTemplate: "{{ record['date'] | upcase }}",
+		},
+	}
+
+	expected := []client.MappingAttributes{
+		{
+			From: client.MappingFrom{
+				Type: "liquid_template",
+				Data: "{{ record['date'] | upcase }}", // Census API expects string directly, not wrapped in hash
+			},
+			To:                  "FormattedDate",
+			IsPrimaryIdentifier: false,
+		},
+	}
+
+	result := provider.ConvertFieldMappingsToMappingAttributes(input)
+	if !reflect.DeepEqual(result, expected) {
+		t.Errorf("convertFieldMappingsToMappingAttributes() got = %+v, want %+v", result, expected)
+	}
+}
+
+// ============================================================================
+// Reverse Mapping Conversion Tests (MappingAttributes → FieldMapping)
+// ============================================================================
+
+func TestConvertMappingAttributesToFieldMappings_LiquidTemplate(t *testing.T) {
+	// Test that we correctly extract liquid template from API response
+	// The Census API returns liquid templates as: {"liquid_template": "..."}
+	input := []client.MappingAttributes{
+		{
+			From: client.MappingFrom{
+				Type: "liquid_template",
+				Data: map[string]interface{}{
+					"liquid_template": "{{ record['date'] | upcase }}",
+				},
+			},
+			To:                  "FormattedDate",
+			IsPrimaryIdentifier: false,
+			SyncNullValues:      boolPtr(true),
+		},
+	}
+
+	expected := []client.FieldMapping{
+		{
+			From:                "",
+			To:                  "FormattedDate",
+			Type:                "liquid_template",
+			LiquidTemplate:      "{{ record['date'] | upcase }}",
+			IsPrimaryIdentifier: false,
+			SyncNullValues:      boolPtr(true),
+		},
+	}
+
+	result := provider.ConvertMappingAttributesToFieldMappings(input)
+	if !reflect.DeepEqual(result, expected) {
+		t.Errorf("ConvertMappingAttributesToFieldMappings() got = %+v, want %+v", result, expected)
+	}
+}
+
+func TestConvertMappingAttributesToFieldMappings_Constant(t *testing.T) {
+	// Test constant value extraction from API
+	input := []client.MappingAttributes{
+		{
+			From: client.MappingFrom{
+				Type: "constant_value",
+				Data: map[string]interface{}{
+					"value":      "Website",
+					"basic_type": "text",
+				},
+			},
+			To:                  "Source",
+			IsPrimaryIdentifier: false,
+			SyncNullValues:      boolPtr(true),
+		},
+	}
+
+	expected := []client.FieldMapping{
+		{
+			From:                "",
+			To:                  "Source",
+			Type:                "constant",
+			Constant:            "Website",
+			IsPrimaryIdentifier: false,
+			SyncNullValues:      boolPtr(true),
+		},
+	}
+
+	result := provider.ConvertMappingAttributesToFieldMappings(input)
+	if !reflect.DeepEqual(result, expected) {
+		t.Errorf("ConvertMappingAttributesToFieldMappings() got = %+v, want %+v", result, expected)
+	}
+}
+
+func TestConvertMappingAttributesToFieldMappings_SyncMetadata(t *testing.T) {
+	// Test sync_metadata extraction from API (returned as string)
+	input := []client.MappingAttributes{
+		{
+			From: client.MappingFrom{
+				Type: "sync_metadata",
+				Data: "sync_run_id",
+			},
+			To:                  "SyncRunID",
+			IsPrimaryIdentifier: false,
+			SyncNullValues:      boolPtr(true),
+		},
+	}
+
+	expected := []client.FieldMapping{
+		{
+			From:                "",
+			To:                  "SyncRunID",
+			Type:                "sync_metadata",
+			SyncMetadataKey:     "sync_run_id",
+			IsPrimaryIdentifier: false,
+			SyncNullValues:      boolPtr(true),
+		},
+	}
+
+	result := provider.ConvertMappingAttributesToFieldMappings(input)
+	if !reflect.DeepEqual(result, expected) {
+		t.Errorf("ConvertMappingAttributesToFieldMappings() got = %+v, want %+v", result, expected)
+	}
+}
+
+func TestConvertMappingAttributesToFieldMappings_SegmentMembership(t *testing.T) {
+	// Test segment_membership extraction from API
+	input := []client.MappingAttributes{
+		{
+			From: client.MappingFrom{
+				Type: "segment_membership",
+				Data: map[string]interface{}{
+					"identify_by": "name",
+				},
+			},
+			To:                  "SegmentField",
+			IsPrimaryIdentifier: false,
+			SyncNullValues:      boolPtr(true),
+		},
+	}
+
+	expected := []client.FieldMapping{
+		{
+			From:                "",
+			To:                  "SegmentField",
+			Type:                "segment_membership",
+			SegmentIdentifyBy:   "name",
+			IsPrimaryIdentifier: false,
+			SyncNullValues:      boolPtr(true),
+		},
+	}
+
+	result := provider.ConvertMappingAttributesToFieldMappings(input)
+	if !reflect.DeepEqual(result, expected) {
+		t.Errorf("ConvertMappingAttributesToFieldMappings() got = %+v, want %+v", result, expected)
+	}
+}
+
+func TestConvertMappingAttributesToFieldMappings_RoundTrip(t *testing.T) {
+	// Test full round-trip: FieldMapping → MappingAttributes → FieldMapping
+	original := []client.FieldMapping{
+		{
+			From:                "email",
+			To:                  "Email",
+			Type:                "direct",
+			IsPrimaryIdentifier: true,
+			SyncNullValues:      boolPtr(true),
+		},
+		{
+			To:             "FormattedDate",
+			Type:           "liquid_template",
+			LiquidTemplate: "{{ record['date'] | upcase }}",
+			SyncNullValues: boolPtr(true),
+		},
+		{
+			To:              "SyncTime",
+			Type:            "sync_metadata",
+			SyncMetadataKey: "sync_run_id",
+			SyncNullValues:  boolPtr(true),
+		},
+		{
+			To:       "Source",
+			Type:     "constant",
+			Constant: "Website",
+			SyncNullValues: boolPtr(true),
+		},
+	}
+
+	// Convert to MappingAttributes (what we send to API)
+	mappingAttrs := provider.ConvertFieldMappingsToMappingAttributes(original)
+
+	// Convert back to FieldMapping (what we read from API)
+	result := provider.ConvertMappingAttributesToFieldMappings(mappingAttrs)
+
+	// Should match original (with "from" field empty for non-direct mappings)
+	expected := []client.FieldMapping{
+		{
+			From:                "email",
+			To:                  "Email",
+			Type:                "direct",
+			IsPrimaryIdentifier: true,
+			SyncNullValues:      boolPtr(true),
+		},
+		{
+			From:           "",
+			To:             "FormattedDate",
+			Type:           "liquid_template",
+			LiquidTemplate: "{{ record['date'] | upcase }}",
+			SyncNullValues: boolPtr(true),
+		},
+		{
+			From:            "",
+			To:              "SyncTime",
+			Type:            "sync_metadata",
+			SyncMetadataKey: "sync_run_id",
+			SyncNullValues:  boolPtr(true),
+		},
+		{
+			From:       "",
+			To:         "Source",
+			Type:       "constant",
+			Constant:   "Website",
+			SyncNullValues: boolPtr(true),
+		},
+	}
+
+	if !reflect.DeepEqual(result, expected) {
+		t.Errorf("Round-trip conversion failed.\nGot:      %+v\nExpected: %+v", result, expected)
+	}
+}
+
+// Helper function for tests
+func boolPtr(b bool) *bool {
+	return &b
+}

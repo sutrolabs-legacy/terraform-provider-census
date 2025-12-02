@@ -616,7 +616,7 @@ func resourceSyncCreate(ctx context.Context, d *schema.ResourceData, meta interf
 	operation := d.Get("operation").(string)
 
 	// Convert FieldMappings to MappingAttributes for API compliance
-	mappings := convertFieldMappingsToMappingAttributes(fieldMappings)
+	mappings := ConvertFieldMappingsToMappingAttributes(fieldMappings)
 
 	// Handle run_mode
 	var mode *client.SyncMode
@@ -850,7 +850,7 @@ To fix this, add the missing workspace_id to terraform state:
 	var fieldMappings []client.FieldMapping
 	if sync.Mappings != nil && len(sync.Mappings) > 0 {
 		fmt.Printf("[DEBUG] Using sync.Mappings (count: %d)\n", len(sync.Mappings))
-		fieldMappings = convertMappingAttributesToFieldMappings(sync.Mappings)
+		fieldMappings = ConvertMappingAttributesToFieldMappings(sync.Mappings)
 	} else if sync.FieldMappings != nil {
 		fmt.Printf("[DEBUG] Using sync.FieldMappings (count: %d)\n", len(sync.FieldMappings))
 		fieldMappings = sync.FieldMappings // Fallback to legacy field
@@ -1032,7 +1032,7 @@ func resourceSyncUpdate(ctx context.Context, d *schema.ResourceData, meta interf
 		Label:                 label,
 		SourceAttributes:      ExpandSourceAttributes(d.Get("source_attributes").([]interface{})),
 		DestinationAttributes: ExpandStringMap(destAttrs),
-		FieldMappings:         ExpandFieldMappings(fieldMappings),
+		Mappings:              ConvertFieldMappingsToMappingAttributes(ExpandFieldMappings(fieldMappings)),
 		Paused:                paused,
 
 		// Mode - live vs triggered with trigger configurations
@@ -1254,6 +1254,11 @@ func ExpandAlerts(alerts []interface{}) []client.AlertAttribute {
 
 		alertAttr := client.AlertAttribute{
 			Options: make(map[string]interface{}),
+		}
+
+		// Preserve alert ID if it exists (required for updates)
+		if id, ok := m["id"].(int); ok {
+			alertAttr.ID = id
 		}
 
 		if alertType, ok := m["type"].(string); ok && alertType != "" {
@@ -1821,8 +1826,8 @@ func convertToString(value interface{}) string {
 	}
 }
 
-// convertFieldMappingsToMappingAttributes converts Terraform FieldMapping to Census API MappingAttributes
-func convertFieldMappingsToMappingAttributes(fieldMappings []client.FieldMapping) []client.MappingAttributes {
+// ConvertFieldMappingsToMappingAttributes converts Terraform FieldMapping structs to Census API MappingAttributes format
+func ConvertFieldMappingsToMappingAttributes(fieldMappings []client.FieldMapping) []client.MappingAttributes {
 	result := make([]client.MappingAttributes, len(fieldMappings))
 
 	for i, fm := range fieldMappings {
@@ -1859,13 +1864,10 @@ func convertFieldMappingsToMappingAttributes(fieldMappings []client.FieldMapping
 			}
 
 		case "liquid_template":
-			// Liquid template transformation
-			templateData := map[string]interface{}{
-				"liquid_template": fm.LiquidTemplate,
-			}
+			// Liquid template transformation - Census API expects the template string directly
 			mappingFrom = client.MappingFrom{
 				Type: "liquid_template",
-				Data: templateData,
+				Data: fm.LiquidTemplate,
 			}
 
 		default:
@@ -1879,20 +1881,23 @@ func convertFieldMappingsToMappingAttributes(fieldMappings []client.FieldMapping
 		result[i] = client.MappingAttributes{
 			From:                mappingFrom,
 			To:                  fm.To,
-			IsPrimaryIdentifier: fm.IsPrimaryIdentifier, // Use value from field_mapping directly
+			IsPrimaryIdentifier: fm.IsPrimaryIdentifier,
 			LookupObject:        fm.LookupObject,
 			LookupField:         fm.LookupField,
 			PreserveValues:      fm.PreserveValues,
 			GenerateField:       fm.GenerateField,
 			SyncNullValues:      fm.SyncNullValues,
+			ArrayField:          fm.ArrayField,
+			FieldType:           fm.FieldType,
+			FollowSourceType:    fm.FollowSourceType,
 		}
 	}
 
 	return result
 }
 
-// convertMappingAttributesToFieldMappings converts Census API MappingAttributes back to Terraform FieldMapping
-func convertMappingAttributesToFieldMappings(mappings []client.MappingAttributes) []client.FieldMapping {
+// ConvertMappingAttributesToFieldMappings converts Census API MappingAttributes back to Terraform FieldMapping
+func ConvertMappingAttributesToFieldMappings(mappings []client.MappingAttributes) []client.FieldMapping {
 	if mappings == nil {
 		return []client.FieldMapping{}
 	}
@@ -1951,8 +1956,12 @@ func convertMappingAttributesToFieldMappings(mappings []client.MappingAttributes
 
 			case "liquid_template":
 				mappingType = "liquid_template"
-				// Census API returns: {"liquid_template": "{{ record['field'] | upcase }}"}
-				if dataMap, ok := ma.From.Data.(map[string]interface{}); ok {
+				// Handle both formats:
+				// - API returns: {"liquid_template": "..."} (hash)
+				// - We send: "..." (string)
+				if dataStr, ok := ma.From.Data.(string); ok {
+					liquidTemplate = dataStr
+				} else if dataMap, ok := ma.From.Data.(map[string]interface{}); ok {
 					if template, ok := dataMap["liquid_template"].(string); ok {
 						liquidTemplate = template
 					}

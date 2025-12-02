@@ -3,6 +3,7 @@ package client
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
@@ -221,7 +222,7 @@ type UpdateSyncRequest struct {
 	Label                 string                 `json:"label,omitempty"`
 	SourceAttributes      map[string]interface{} `json:"source_attributes,omitempty"`
 	DestinationAttributes map[string]interface{} `json:"destination_attributes,omitempty"`
-	FieldMappings         []FieldMapping         `json:"field_mappings,omitempty"`
+	Mappings              []MappingAttributes    `json:"mappings,omitempty"` // Use OpenAPI-compliant format like CreateSyncRequest
 	SyncKey               []string               `json:"sync_key,omitempty"`
 	SyncMode              string                 `json:"sync_mode,omitempty"`
 
@@ -391,11 +392,37 @@ func (c *Client) UpdateSync(ctx context.Context, syncID int, req *UpdateSyncRequ
 
 // UpdateSyncWithToken updates an existing sync using a specific workspace token
 func (c *Client) UpdateSyncWithToken(ctx context.Context, syncID int, req *UpdateSyncRequest, workspaceToken string) (*Sync, error) {
+	// Log the request being sent
+	fmt.Printf("[DEBUG] Update sync %d request: %+v\n", syncID, req)
+
+	// Also log the JSON that will be sent
+	if reqJSON, err := json.MarshalIndent(req, "", "  "); err == nil {
+		fmt.Printf("[DEBUG] Update sync %d request JSON:\n%s\n", syncID, string(reqJSON))
+	}
+
 	path := fmt.Sprintf("/syncs/%d", syncID)
 	resp, err := c.makeRequestWithToken(ctx, http.MethodPatch, path, req, TokenTypeWorkspace, workspaceToken)
 	if err != nil {
 		return nil, fmt.Errorf("failed to make update sync request: %w", err)
 	}
+
+	// Read the raw response body for debugging
+	bodyBytes, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read response body: %w", err)
+	}
+
+	fmt.Printf("[DEBUG] Update sync %d raw response: %s\n", syncID, string(bodyBytes))
+
+	// Write request and response to debug file
+	debugFile := fmt.Sprintf("/tmp/census_sync_update_%d_debug.log", syncID)
+	reqJSON, _ := json.MarshalIndent(req, "", "  ")
+	debugContent := fmt.Sprintf("=== UPDATE SYNC %d DEBUG ===\n\nREQUEST:\n%+v\n\nREQUEST JSON:\n%s\n\nRAW RESPONSE:\n%s\n\n", syncID, req, string(reqJSON), string(bodyBytes))
+	os.WriteFile(debugFile, []byte(debugContent), 0644)
+	fmt.Printf("[DEBUG] Debug info written to %s\n", debugFile)
+
+	// Reset the response body so handleResponse can read it
+	resp.Body = io.NopCloser(bytes.NewReader(bodyBytes))
 
 	var result SyncResponse
 	if err := c.handleResponse(resp, &result); err != nil {
