@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"hash/fnv"
 	"reflect"
 	"strconv"
 	"strings"
@@ -16,20 +15,10 @@ import (
 	"github.com/sutrolabs/terraform-provider-census/census/client"
 )
 
-func resourceSync() *schema.Resource {
-	return &schema.Resource{
-		Description: "Manages a Census data sync between a source and destination.",
-
-		CreateContext: resourceSyncCreate,
-		ReadContext:   resourceSyncRead,
-		UpdateContext: resourceSyncUpdate,
-		DeleteContext: resourceSyncDelete,
-
-		Importer: &schema.ResourceImporter{
-			StateContext: resourceSyncImport,
-		},
-
-		Schema: map[string]*schema.Schema{
+// syncSchemaMap returns the schema map for the sync resource
+// The alertCollectionType parameter allows switching between TypeSet (v0) and TypeList (v1) for alerts
+func syncSchemaMap(alertCollectionType schema.ValueType) map[string]*schema.Schema {
+	return map[string]*schema.Schema{
 			"id": {
 				Type:        schema.TypeString,
 				Computed:    true,
@@ -328,10 +317,10 @@ func resourceSync() *schema.Resource {
 					"upload_and_swap",
 				}, false),
 			},
-			"alert": {
-				Type:        schema.TypeSet,
-				Optional:    true,
-				Description: "Alert configurations for the sync. Multiple alerts of different types can be configured.",
+		"alert": {
+			Type:        alertCollectionType, // Parameterized: TypeSet for v0, TypeList for v1
+			Optional:    true,
+			Description: "Alert configurations for the sync. Multiple alerts of different types can be configured.",
 				Elem: &schema.Resource{
 					Schema: map[string]*schema.Schema{
 						"id": {
@@ -378,8 +367,7 @@ func resourceSync() *schema.Resource {
 						},
 					},
 				},
-				Set: alertHash,
-			},
+		},
 			"run_mode": {
 				Type:        schema.TypeList,
 				Optional:    true,
@@ -506,7 +494,6 @@ func resourceSync() *schema.Resource {
 					},
 				},
 			},
-			// Computed fields
 			"status": {
 				Type:        schema.TypeString,
 				Computed:    true,
@@ -537,41 +524,49 @@ func resourceSync() *schema.Resource {
 				Computed:    true,
 				Description: "ID of the last sync run.",
 			},
-		},
 	}
 }
 
-// alertHash creates a hash for an alert to use in a TypeSet
-func alertHash(v interface{}) int {
-	m := v.(map[string]interface{})
+func resourceSync() *schema.Resource {
+	return &schema.Resource{
+		Description: "Manages a Census data sync between a source and destination.",
 
-	// Create a unique string representation based on type and key options
-	alertType := ""
-	if val, ok := m["type"].(string); ok {
-		alertType = val
+		CreateContext: resourceSyncCreate,
+		ReadContext:   resourceSyncRead,
+		UpdateContext: resourceSyncUpdate,
+		DeleteContext: resourceSyncDelete,
+
+		Importer: &schema.ResourceImporter{
+			StateContext: resourceSyncImport,
+		},
+
+		SchemaVersion: 1,
+		StateUpgraders: []schema.StateUpgrader{
+			{
+				Type:    resourceSyncV0().CoreConfigSchema().ImpliedType(),
+				Upgrade: resourceSyncStateUpgradeV0,
+				Version: 0,
+			},
+		},
+
+		Schema: syncSchemaMap(schema.TypeList),
 	}
+}
 
-	sendFor := "first_time" // default
-	if val, ok := m["send_for"].(string); ok && val != "" {
-		sendFor = val
+// resourceSyncV0 returns the v0 schema (with TypeSet for alerts)
+func resourceSyncV0() *schema.Resource {
+	return &schema.Resource{
+		Schema: syncSchemaMap(schema.TypeSet),
 	}
+}
 
-	shouldSendRecovery := "true" // default
-	if val, ok := m["should_send_recovery"].(bool); ok {
-		shouldSendRecovery = fmt.Sprintf("%t", val)
-	}
-
-	// Include options in hash for uniqueness
-	hashStr := fmt.Sprintf("%s:%s:%s", alertType, sendFor, shouldSendRecovery)
-
-	// Add options to hash if present
-	if options, ok := m["options"].(map[string]interface{}); ok && len(options) > 0 {
-		hashStr = fmt.Sprintf("%s:%v", hashStr, options)
-	}
-
-	h := fnv.New32a()
-	h.Write([]byte(hashStr))
-	return int(h.Sum32())
+// resourceSyncStateUpgradeV0 upgrades the state from v0 to v1
+// Migrates alert field from TypeSet to TypeList
+func resourceSyncStateUpgradeV0(ctx context.Context, rawState map[string]interface{}, meta interface{}) (map[string]interface{}, error) {
+	// TypeSet and TypeList store data identically in JSON state (as arrays)
+	// No data transformation needed - just return state unchanged
+	// Terraform will re-interpret it with the new schema
+	return rawState, nil
 }
 
 // suppressEquivalentJSON suppresses diffs for JSON strings that are semantically equivalent
@@ -666,7 +661,7 @@ func resourceSyncCreate(ctx context.Context, d *schema.ResourceData, meta interf
 		MirrorStrategy: d.Get("mirror_strategy").(string),
 
 		// Alert configuration
-		AlertAttributes: ExpandAlerts(d.Get("alert").(*schema.Set).List()),
+		AlertAttributes: ExpandAlerts(d.Get("alert").([]interface{})),
 	}
 
 	fmt.Printf("[DEBUG] Creating sync with request: %+v\n", req)
@@ -1032,14 +1027,6 @@ func resourceSyncUpdate(ctx context.Context, d *schema.ResourceData, meta interf
 	syncBehaviorFamilyInterface := d.Get("sync_behavior_family")
 	syncBehaviorFamily, _ := syncBehaviorFamilyInterface.(string)
 
-	// Safe type assertions for alerts
-	alertInterface := d.Get("alert")
-	alertSet, ok := alertInterface.(*schema.Set)
-	if !ok {
-		fmt.Printf("[DEBUG] alert is not a *schema.Set, type: %T, value: %+v\n", alertInterface, alertInterface)
-		return diag.Errorf("alert is not a valid set: %v", alertInterface)
-	}
-
 	req := &client.UpdateSyncRequest{
 		Label:                 label,
 		SourceAttributes:      ExpandSourceAttributes(d.Get("source_attributes").([]interface{})),
@@ -1071,7 +1058,7 @@ func resourceSyncUpdate(ctx context.Context, d *schema.ResourceData, meta interf
 		MirrorStrategy: d.Get("mirror_strategy").(string),
 
 		// Alert configuration
-		AlertAttributes: ExpandAlerts(alertSet.List()),
+		AlertAttributes: ExpandAlerts(d.Get("alert").([]interface{})),
 	}
 
 	fmt.Printf("[DEBUG] Update request: %+v\n", req)

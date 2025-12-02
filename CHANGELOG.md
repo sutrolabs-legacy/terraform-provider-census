@@ -5,6 +5,11 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.2.3] - 2025-12-02
+
+### Fixed
+- Fix ghost alert entries appearing when removing alerts from syncs. This was caused by a Terraform SDK bug with TypeSet that creates zero-value entries during removal operations (N→N-1 or N→0). The fix migrates alert storage from TypeSet to TypeList, addressing the root cause. State is automatically compatible between versions - no manual migration needed.
+
 ## [0.2.2] - 2025-12-01
 
 ### Fixed
