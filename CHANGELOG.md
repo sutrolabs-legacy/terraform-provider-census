@@ -5,6 +5,23 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased - v0.3.0]
+
+### Changed
+- **[PLANNED]** Migrate `field_mapping` from TypeList to TypeSet for true order independence. This will cause a one-time diff showing all mappings as "replaced" during upgrade, but eliminates all future order-related drift. The migration is automatic and safe - mappings are keyed by destination field ("to") which is unique per sync. Users will see a large but harmless diff on first upgrade.
+
+## [0.2.4] - 2025-12-03
+
+### Fixed
+- **Sync Update API Format**: Fixed sync updates to use OpenAPI-compliant `mappings` field ([]MappingAttributes) instead of `field_mappings` ([]FieldMapping). This ensures sync updates are properly formatted for the Census API.
+- **Liquid Template Mapping Format**: Fixed liquid_template mappings to send the template string directly to the API (`"{{ template }}"`) instead of incorrectly wrapping it in a hash (`{"liquid_template": "{{ template }}"}`). This resolves errors when creating or updating syncs with liquid template mappings.
+- **Alert ID Preservation**: Fixed alert updates to preserve existing alert IDs, preventing API errors during sync updates.
+
+### Added
+- Comprehensive unit tests for mapping format conversions (9 new test cases)
+- Debug logging to help diagnose sync update issues
+- Export conversion functions (ConvertFieldMappingsToMappingAttributes, ConvertMappingAttributesToFieldMappings) for testability
+
 ## [0.2.3] - 2025-12-02
 
 ### Fixed
