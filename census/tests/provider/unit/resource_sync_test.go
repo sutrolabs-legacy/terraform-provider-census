@@ -1356,9 +1356,9 @@ func TestConvertMappingAttributesToFieldMappings_RoundTrip(t *testing.T) {
 			SyncNullValues:  boolPtr(true),
 		},
 		{
-			To:       "Source",
-			Type:     "constant",
-			Constant: "Website",
+			To:             "Source",
+			Type:           "constant",
+			Constant:       "Website",
 			SyncNullValues: boolPtr(true),
 		},
 	}
@@ -1393,10 +1393,10 @@ func TestConvertMappingAttributesToFieldMappings_RoundTrip(t *testing.T) {
 			SyncNullValues:  boolPtr(true),
 		},
 		{
-			From:       "",
-			To:         "Source",
-			Type:       "constant",
-			Constant:   "Website",
+			From:           "",
+			To:             "Source",
+			Type:           "constant",
+			Constant:       "Website",
 			SyncNullValues: boolPtr(true),
 		},
 	}
