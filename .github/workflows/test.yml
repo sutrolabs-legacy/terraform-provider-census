@@ -5,6 +5,7 @@ on:
     branches: [ main ]
   pull_request:
     branches: [ main ]
+  workflow_dispatch:
 
 # Prevent concurrent integration tests from conflicting
 # Queue commits to main, cancel in-progress PR runs
