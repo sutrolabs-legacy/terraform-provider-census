@@ -74,7 +74,7 @@ census_region = "us"  # or "eu"
 source_type = "postgres"  # or snowflake, bigquery, etc.
 source_connection = {
   host     = "your-database.amazonaws.com"
-  port     = "5432" 
+  port     = 5432  # Numbers work directly, no need for quotes
   username = "census_user"
   password = "your-password"
   database = "analytics"
@@ -83,9 +83,9 @@ source_connection = {
 destination_type = "salesforce"  # or hubspot, postgres, etc.
 destination_connection = {
   username       = "your-sf-user@company.com"
-  password       = "your-sf-password" 
+  password       = "your-sf-password"
   security_token = "your-sf-security-token"
-  sandbox        = "false"
+  sandbox        = false  # Booleans work directly!
 }
 
 # Auto-refresh metadata after creating/updating connections
@@ -157,7 +157,7 @@ Configure different connections for staging environments:
 # Production database
 source_connection = {
   host     = "prod-db.company.com"
-  port     = "5432"
+  port     = 5432
   username = "census_prod"
   password = "prod-password"
   database = "analytics"
@@ -166,7 +166,7 @@ source_connection = {
 # Staging database (optional - falls back to production config if not set)
 staging_source_connection = {
   host     = "staging-db.company.com"
-  port     = "5432"
+  port     = 5432
   username = "census_staging"
   password = "staging-password"
   database = "staging_analytics"
@@ -177,7 +177,7 @@ destination_connection = {
   username       = "census@company.com"
   password       = "prod-password"
   security_token = "prod-token"
-  sandbox        = "false"
+  sandbox        = false
 }
 
 # Staging Salesforce (optional)
@@ -185,7 +185,7 @@ staging_destination_connection = {
   username       = "census@company.com.staging"
   password       = "staging-password"
   security_token = "staging-token"
-  sandbox        = "true"
+  sandbox        = true
 }
 ```
 
@@ -237,7 +237,7 @@ staging_destination_connection = {
 
 ## Common Connection Examples
 
-### Snowflake
+### Snowflake (Password Authentication)
 ```hcl
 source_type = "snowflake"
 source_connection = {
@@ -247,6 +247,21 @@ source_connection = {
   warehouse = "COMPUTE_WH"
   database  = "ANALYTICS"
   schema    = "PUBLIC"
+}
+```
+
+### Snowflake (Keypair Authentication)
+```hcl
+source_type = "snowflake"
+source_connection = {
+  account                = "abc12345.us-east-1"
+  warehouse              = "COMPUTE_WH"
+  database               = "PRODUCTION"
+  username               = "census_user"
+  role                   = "CENSUS_ROLE"
+  use_keypair            = true  # Boolean works directly!
+  private_key_pkcs8      = var.snowflake_private_key
+  private_key_passphrase = var.snowflake_key_passphrase  # Optional
 }
 ```
 

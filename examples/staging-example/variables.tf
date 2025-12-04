@@ -35,8 +35,8 @@ variable "source_type" {
 }
 
 variable "source_credentials" {
-  description = "Credentials for the data source"
-  type        = map(string)
+  description = "Credentials for the data source (supports booleans, numbers, and strings)"
+  type        = map(any)
   sensitive   = true
 }
 
@@ -58,8 +58,8 @@ variable "destination_type" {
 }
 
 variable "destination_credentials" {
-  description = "Credentials for the destination"
-  type        = map(string)
+  description = "Credentials for the destination (supports booleans, numbers, and strings)"
+  type        = map(any)
   sensitive   = true
 }
 

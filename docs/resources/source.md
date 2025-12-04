@@ -12,14 +12,14 @@ resource "census_source" "warehouse" {
   name         = "Production Warehouse"
   type         = "snowflake"
 
-  connection_config = jsonencode({
+  connection_config = {
     account        = "abc12345.us-east-1"
     warehouse      = "COMPUTE_WH"
     database       = "PRODUCTION"
     username       = "census_user"
     password       = var.snowflake_password
     role           = "CENSUS_ROLE"
-  })
+  }
 }
 ```
 
@@ -31,16 +31,16 @@ resource "census_source" "warehouse_keypair" {
   name         = "Production Warehouse (Keypair)"
   type         = "snowflake"
 
-  connection_config = jsonencode({
-    account              = "abc12345.us-east-1"
-    warehouse            = "COMPUTE_WH"
-    database             = "PRODUCTION"
-    username             = "census_user"
-    role                 = "CENSUS_ROLE"
-    use_keypair          = true
-    private_key_pkcs8    = var.snowflake_private_key
+  connection_config = {
+    account                = "abc12345.us-east-1"
+    warehouse              = "COMPUTE_WH"
+    database               = "PRODUCTION"
+    username               = "census_user"
+    role                   = "CENSUS_ROLE"
+    use_keypair            = true  # Boolean works directly!
+    private_key_pkcs8      = var.snowflake_private_key
     private_key_passphrase = var.snowflake_key_passphrase  # Optional, omit if key is not encrypted
-  })
+  }
 }
 ```
 
@@ -52,11 +52,11 @@ resource "census_source" "bigquery" {
   name         = "Analytics BigQuery"
   type         = "big_query"
 
-  connection_config = jsonencode({
+  connection_config = {
     project_id = "my-gcp-project"
     dataset_id = "analytics"
     private_key = var.gcp_service_account_key
-  })
+  }
 }
 ```
 
@@ -68,13 +68,13 @@ resource "census_source" "postgres" {
   name         = "Production Database"
   type         = "postgres"
 
-  connection_config = jsonencode({
+  connection_config = {
     host     = "postgres.example.com"
-    port     = 5432
+    port     = 5432  # Numbers work directly
     database = "production"
     username = "census"
     password = var.postgres_password
-  })
+  }
 }
 ```
 
@@ -90,7 +90,7 @@ resource "census_source" "postgres" {
   - `databricks`
   - `mysql`
   - And many more... (validated against Census API)
-* `connection_config` - (Required, Sensitive) JSON-encoded credentials for connecting to the source. The required fields vary by source type and are validated against the Census API schema.
+* `connection_config` - (Required, Sensitive) Map of credentials for connecting to the source. Supports strings, numbers, and booleans. The required fields vary by source type and are validated against the Census API schema.
 
 ## Attribute Reference
 

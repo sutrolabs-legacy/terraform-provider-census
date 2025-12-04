@@ -56,7 +56,6 @@ resource "census_workspace" "revops_prod" {
 # Create sources explicitly tied to specific workspaces
 # Each source belongs to exactly one workspace
 
-# Postgres sources (original)
 resource "census_source" "marketing_prod_postgres" {
   workspace_id = census_workspace.marketing_prod.id
 
@@ -77,9 +76,6 @@ resource "census_source" "revops_prod_postgres" {
   auto_refresh_tables = var.enable_auto_refresh
 }
 
-# Add staging warehouse sources for the staging sync
-
-# Postgres staging source (original)
 resource "census_source" "marketing_staging_postgres" {
   workspace_id = census_workspace.marketing_staging.id
 
@@ -90,7 +86,6 @@ resource "census_source" "marketing_staging_postgres" {
   auto_refresh_tables = var.enable_auto_refresh
 }
 
-# Redshift staging source (working connection)
 resource "census_source" "marketing_staging_warehouse" {
   workspace_id = census_workspace.marketing_staging.id
 
@@ -101,7 +96,6 @@ resource "census_source" "marketing_staging_warehouse" {
   auto_refresh_tables = var.enable_auto_refresh
 }
 
-# Redshift sources (working connection)
 resource "census_source" "marketing_prod_warehouse" {
   workspace_id = census_workspace.marketing_prod.id
 
@@ -119,6 +113,16 @@ resource "census_source" "revops_prod_warehouse" {
   type = "redshift"
 
   connection_config   = var.redshift_warehouse_connection
+  auto_refresh_tables = var.enable_auto_refresh
+}
+
+resource "census_source" "marketing_prod_snowflake" {
+  workspace_id = census_workspace.marketing_prod.id
+
+  name = "Marketing Production Snowflake Warehouse"
+  type = "snowflake"
+
+  connection_config   = var.snowflake_warehouse_connection
   auto_refresh_tables = var.enable_auto_refresh
 }
 

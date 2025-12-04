@@ -100,7 +100,7 @@ terraform apply
 
 ### Destination Types Supported
 
-- `salesforce` - Salesforce (set `sandbox = "true"` for sandboxes)
+- `salesforce` - Salesforce (set `sandbox = true` for sandboxes, use boolean not string)
 - `hubspot` - HubSpot
 - `intercom` - Intercom
 - `postgres` - PostgreSQL (can be used as destination)
@@ -225,7 +225,7 @@ By default, syncs are created in a paused state (`sync_paused = true`) to preven
 If source or destination connections fail:
 1. Verify credentials are correct for staging environment
 2. Check network connectivity and firewall rules
-3. For Salesforce sandboxes, ensure `sandbox = "true"` is set
+3. For Salesforce sandboxes, ensure `sandbox = true` is set (boolean, not string)
 4. Verify the staging API URL is accessible
 
 ### API Errors
