@@ -10,6 +10,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 - **[PLANNED]** Migrate `field_mapping` from TypeList to TypeSet for true order independence. This will cause a one-time diff showing all mappings as "replaced" during upgrade, but eliminates all future order-related drift. The migration is automatic and safe - mappings are keyed by destination field ("to") which is unique per sync. Users will see a large but harmless diff on first upgrade.
 
+## [0.2.5] - 2025-12-12
+
+### Changed
+- Increased HTTP client timeout from 30 seconds to 8 minutes to better handle high-latency scenarios, particularly for creating syncs, which can take a few minutes. This prevents premature client-side timeouts while Census API operations are still processing, reducing state drift and improving reliability when creating large numbers of resources.
+
 ## [0.2.4] - 2025-12-03
 
 ### Fixed
