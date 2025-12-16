@@ -236,12 +236,8 @@ func (c *Client) executeRequest(ctx context.Context, req *http.Request, bodyByte
 // Implements exponential backoff with jitter and respects Retry-After header
 // Only retries 429 errors; all other errors/statuses are returned immediately
 func (c *Client) makeRequestWithRetry(ctx context.Context, req *http.Request, bodyBytes []byte) (*http.Response, error) {
-	// Determine deadline for timeout checks
-	deadline, hasDeadline := ctx.Deadline()
-	if !hasDeadline {
-		// Fallback to 8-minute timeout (should not happen with httpClient.Timeout set)
-		deadline = time.Now().Add(8 * time.Minute)
-	}
+	// Use retry budget timeout (separate from per-request HTTP timeout)
+	deadline := time.Now().Add(retryBudgetTimeout)
 
 	startTime := time.Now()
 	attempt := 0
