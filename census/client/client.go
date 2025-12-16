@@ -17,10 +17,11 @@ import (
 
 // Rate limit retry configuration
 const (
-	initialRetryDelay = 1 * time.Second
-	maxRetryDelay     = 90 * time.Second
-	backoffMultiplier = 2.0
-	jitterFactor      = 0.2
+	retryBudgetTimeout = 5 * time.Minute // Total time budget for retrying 429s
+	initialRetryDelay  = 1 * time.Second
+	maxRetryDelay      = 90 * time.Second
+	backoffMultiplier  = 2.0
+	jitterFactor       = 0.2
 )
 
 // Config holds the configuration for the Census API client
