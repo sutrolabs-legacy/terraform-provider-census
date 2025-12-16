@@ -104,10 +104,10 @@ func TestCalculateRetryDelay_ExponentialBackoff(t *testing.T) {
 		minExpected time.Duration
 		maxExpected time.Duration
 	}{
-		{name: "attempt_1", attempt: 1, minExpected: 800 * time.Millisecond, maxExpected: 1200 * time.Millisecond},   // 1s ± 20%
-		{name: "attempt_2", attempt: 2, minExpected: 1600 * time.Millisecond, maxExpected: 2400 * time.Millisecond},  // 2s ± 20%
-		{name: "attempt_3", attempt: 3, minExpected: 3200 * time.Millisecond, maxExpected: 4800 * time.Millisecond},  // 4s ± 20%
-		{name: "attempt_4", attempt: 4, minExpected: 6400 * time.Millisecond, maxExpected: 9600 * time.Millisecond},  // 8s ± 20%
+		{name: "attempt_1", attempt: 1, minExpected: 800 * time.Millisecond, maxExpected: 1200 * time.Millisecond},    // 1s ± 20%
+		{name: "attempt_2", attempt: 2, minExpected: 1600 * time.Millisecond, maxExpected: 2400 * time.Millisecond},   // 2s ± 20%
+		{name: "attempt_3", attempt: 3, minExpected: 3200 * time.Millisecond, maxExpected: 4800 * time.Millisecond},   // 4s ± 20%
+		{name: "attempt_4", attempt: 4, minExpected: 6400 * time.Millisecond, maxExpected: 9600 * time.Millisecond},   // 8s ± 20%
 		{name: "attempt_5", attempt: 5, minExpected: 12800 * time.Millisecond, maxExpected: 19200 * time.Millisecond}, // 16s ± 20%
 		{name: "attempt_10", attempt: 10, minExpected: 72 * time.Second, maxExpected: 108 * time.Second},              // Capped at 90s ± 20%
 	}
