@@ -19,6 +19,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 - **[PLANNED]** Migrate `field_mapping` from TypeList to TypeSet for true order independence. This will cause a one-time diff showing all mappings as "replaced" during upgrade, but eliminates all future order-related drift. The migration is automatic and safe - mappings are keyed by destination field ("to") which is unique per sync. Users will see a large but harmless diff on first upgrade.
 
+## [0.2.6] - 2025-12-16
+
+### Fixed
+- **Sync Schedule Type Mismatch**: Fixed critical bug where `schedule_day` field type mismatch caused "Provider produced inconsistent result after apply" errors when creating syncs with cron-based schedules. The Census API returns `schedule_day` as a string (e.g., "Monday"), but the provider struct expected `*int`, causing JSON unmarshaling to silently fail. Changed `schedule_day` to `*string` to match the API contract.
+
 ## [0.2.5] - 2025-12-12
 
 ### Changed
