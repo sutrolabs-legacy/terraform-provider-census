@@ -165,7 +165,7 @@ func (c *Client) handleResponse(resp *http.Response, result interface{}) error {
 
 	if result != nil && len(body) > 0 {
 		if err := json.Unmarshal(body, result); err != nil {
-			return fmt.Errorf("failed to decode response JSON: %w", err)
+			return fmt.Errorf("failed to decode response JSON: %w\n\nRaw API response:\n%s", err, string(body))
 		}
 	}
 
