@@ -14,8 +14,10 @@ resource "census_sync" "user_sync" {
   source_attributes {
     connection_id = census_source.warehouse.id
     object {
-      type       = "table"
-      table_name = "users"
+      type          = "table"
+      table_name    = "users"
+      table_schema  = "demo"
+      table_catalog = "dev"
     }
   }
 
@@ -162,8 +164,10 @@ resource "census_sync" "tagged_sync" {
   source_attributes {
     connection_id = census_source.warehouse.id
     object {
-      type       = "table"
-      table_name = "users"
+      type          = "table"
+      table_name    = "users"
+      table_schema  = "demo"
+      table_catalog = "dev"
     }
   }
 
@@ -198,8 +202,10 @@ resource "census_sync" "metadata_sync" {
   source_attributes {
     connection_id = census_source.warehouse.id
     object {
-      type       = "table"
-      table_name = "users"
+      type          = "table"
+      table_name    = "users"
+      table_schema  = "demo"
+      table_catalog = "dev"
     }
   }
 
@@ -240,8 +246,10 @@ resource "census_sync" "segment_sync" {
   source_attributes {
     connection_id = census_source.warehouse.id
     object {
-      type       = "table"
-      table_name = "users"
+      type          = "table"
+      table_name    = "users"
+      table_schema  = "demo"
+      table_catalog = "dev"
     }
   }
 
@@ -277,8 +285,10 @@ resource "census_sync" "template_sync" {
   source_attributes {
     connection_id = census_source.warehouse.id
     object {
-      type       = "table"
-      table_name = "users"
+      type          = "table"
+      table_name    = "users"
+      table_schema  = "demo"
+      table_catalog = "dev"
     }
   }
 
@@ -319,8 +329,10 @@ resource "census_sync" "auto_sync" {
   source_attributes {
     connection_id = census_source.warehouse.id
     object {
-      type       = "table"
-      table_name = "users"
+      type          = "table"
+      table_name    = "users"
+      table_schema  = "demo"
+      table_catalog = "dev"
     }
   }
 
@@ -367,9 +379,9 @@ resource "census_sync" "sheets_sync" {
     connection_id = census_source.warehouse.id
     object {
       type          = "table"
-      table_name    = "analytics_summary"
-      table_schema  = "public"
-      table_catalog = "production"
+      table_name    = "users"
+      table_schema  = "demo"
+      table_catalog = "dev"
     }
   }
 
@@ -408,8 +420,10 @@ resource "census_sync" "user_list_sync" {
   source_attributes {
     connection_id = census_source.warehouse.id
     object {
-      type       = "table"
-      table_name = "users"
+      type          = "table"
+      table_name    = "users"
+      table_schema  = "demo"
+      table_catalog = "dev"
     }
   }
 
@@ -506,8 +520,10 @@ resource "census_sync" "monitored_sync" {
   source_attributes {
     connection_id = census_source.warehouse.id
     object {
-      type       = "table"
-      table_name = "customers"
+      type          = "table"
+      table_name    = "users"
+      table_schema  = "demo"
+      table_catalog = "dev"
     }
   }
 
@@ -592,8 +608,10 @@ resource "census_sync" "mirror_sync" {
   source_attributes {
     connection_id = census_source.warehouse.id
     object {
-      type       = "table"
-      table_name = "products"
+      type          = "table"
+      table_name    = "users"
+      table_schema  = "demo"
+      table_catalog = "dev"
     }
   }
 
@@ -638,8 +656,10 @@ resource "census_sync" "incremental_append" {
   source_attributes {
     connection_id = census_source.warehouse.id
     object {
-      type       = "table"
-      table_name = "event_logs"
+      type          = "table"
+      table_name    = "users"
+      table_schema  = "demo"
+      table_catalog = "dev"
     }
   }
 
@@ -692,8 +712,10 @@ resource "census_sync" "preserve_example" {
   source_attributes {
     connection_id = census_source.warehouse.id
     object {
-      type       = "table"
-      table_name = "customers"
+      type          = "table"
+      table_name    = "users"
+      table_schema  = "demo"
+      table_catalog = "dev"
     }
   }
 
