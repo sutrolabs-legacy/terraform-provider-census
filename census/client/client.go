@@ -51,7 +51,7 @@ func NewClient(config *Config) (*Client, error) {
 	httpClient := config.HTTPClient
 	if httpClient == nil {
 		httpClient = &http.Client{
-			Timeout: 8 * time.Minute,
+			Timeout: 60 * time.Second, // Match Census API timeout
 		}
 	}
 
