@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased - v0.3.0]
 
+### Changed
+- **[PLANNED]** Migrate `field_mapping` from TypeList to TypeSet for true order independence. This will cause a one-time diff showing all mappings as "replaced" during upgrade, but eliminates all future order-related drift. The migration is automatic and safe - mappings are keyed by destination field ("to") which is unique per sync. Users will see a large but harmless diff on first upgrade.
+
+## [0.2.7] - 2025-12-16
+
 ### Added
 - **429 Rate Limit Handling**: Automatic retry with exponential backoff for HTTP 429 (Too Many Requests) responses. The provider now intelligently handles rate limiting by:
   - Respecting `Retry-After` header when provided by the Census API (supports both delay-seconds and HTTP-date formats per RFC 7231)
@@ -15,9 +20,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Only retrying 429 errors (other errors like 5xx, network failures are not retried and fail immediately)
   - Providing debug and warning logs for retry attempts via Terraform's structured logging
   - Gracefully handling context cancellation and deadline exhaustion
-
-### Changed
-- **[PLANNED]** Migrate `field_mapping` from TypeList to TypeSet for true order independence. This will cause a one-time diff showing all mappings as "replaced" during upgrade, but eliminates all future order-related drift. The migration is automatic and safe - mappings are keyed by destination field ("to") which is unique per sync. Users will see a large but harmless diff on first upgrade.
 
 ## [0.2.6] - 2025-12-16
 
