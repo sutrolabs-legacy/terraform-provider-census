@@ -6,10 +6,21 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"math/rand"
 	"net/http"
 	"net/url"
 	"strconv"
 	"time"
+
+	"github.com/hashicorp/terraform-plugin-log/tflog"
+)
+
+// Rate limit retry configuration
+const (
+	initialRetryDelay = 1 * time.Second
+	maxRetryDelay     = 90 * time.Second
+	backoffMultiplier = 2.0
+	jitterFactor      = 0.2
 )
 
 // Config holds the configuration for the Census API client
@@ -88,17 +99,20 @@ func (c *Client) makeRequest(ctx context.Context, method, path string, body inte
 
 // makeRequestWithToken performs an HTTP request to the Census API with a specific token
 func (c *Client) makeRequestWithToken(ctx context.Context, method, path string, body interface{}, tokenType TokenType, specificToken string) (*http.Response, error) {
-	var reqBody io.Reader
+	// Marshal body to bytes for retry replay capability
+	var bodyBytes []byte
 	if body != nil {
-		jsonBody, err := json.Marshal(body)
+		var err error
+		bodyBytes, err = json.Marshal(body)
 		if err != nil {
 			return nil, fmt.Errorf("failed to marshal request body: %w", err)
 		}
-		reqBody = bytes.NewReader(jsonBody)
 	}
 
 	fullURL := c.config.BaseURL + path
-	req, err := http.NewRequestWithContext(ctx, method, fullURL, reqBody)
+
+	// Create request without body first (body will be set per-attempt in executeRequest)
+	req, err := http.NewRequestWithContext(ctx, method, fullURL, nil)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create request: %w", err)
 	}
@@ -130,7 +144,8 @@ func (c *Client) makeRequestWithToken(ctx context.Context, method, path string, 
 
 	req.Header.Set("Authorization", "Bearer "+token)
 
-	return c.httpClient.Do(req)
+	// Execute with retry logic for 429 rate limits
+	return c.makeRequestWithRetry(ctx, req, bodyBytes)
 }
 
 // TokenType represents the type of authentication token to use
@@ -140,6 +155,170 @@ const (
 	TokenTypePersonal TokenType = iota
 	TokenTypeWorkspace
 )
+
+// parseRetryAfter parses the Retry-After header per RFC 7231
+// Returns delay duration and any parsing error
+func parseRetryAfter(header string) (time.Duration, error) {
+	// Try delay-seconds format (integer)
+	if seconds, err := strconv.ParseInt(header, 10, 64); err == nil {
+		return time.Duration(seconds) * time.Second, nil
+	}
+
+	// Try HTTP-date formats (RFC 1123, RFC 850, ANSI C)
+	for _, layout := range []string{time.RFC1123, time.RFC850, time.ANSIC} {
+		if t, err := time.Parse(layout, header); err == nil {
+			delay := time.Until(t)
+			if delay < 0 {
+				return 0, nil // Past date = retry immediately
+			}
+			return delay, nil
+		}
+	}
+
+	return 0, fmt.Errorf("invalid Retry-After format: %s", header)
+}
+
+// calculateRetryDelay determines the delay before the next retry
+// Prefers Retry-After header, falls back to exponential backoff with jitter
+func calculateRetryDelay(resp *http.Response, attempt int, deadline time.Time) time.Duration {
+	// Check Retry-After header first
+	if retryAfter := resp.Header.Get("Retry-After"); retryAfter != "" {
+		if delay, err := parseRetryAfter(retryAfter); err == nil {
+			// Ensure delay doesn't exceed remaining time
+			remaining := time.Until(deadline)
+			if delay > remaining {
+				return remaining
+			}
+			return delay
+		}
+		// If parsing fails, fall through to exponential backoff
+	}
+
+	// Exponential backoff: initialDelay * (multiplier ^ (attempt - 1))
+	delay := initialRetryDelay
+	for i := 1; i < attempt; i++ {
+		delay = time.Duration(float64(delay) * backoffMultiplier)
+		if delay > maxRetryDelay {
+			delay = maxRetryDelay
+			break
+		}
+	}
+
+	// Add jitter: ±20% randomization
+	jitter := float64(delay) * jitterFactor * (2*rand.Float64() - 1)
+	delay += time.Duration(jitter)
+
+	// Ensure delay doesn't exceed remaining time
+	remaining := time.Until(deadline)
+	if delay > remaining {
+		return remaining
+	}
+
+	return delay
+}
+
+// executeRequest performs a single HTTP request attempt
+// Handles body replay for retries by recreating the body from bytes
+func (c *Client) executeRequest(ctx context.Context, req *http.Request, bodyBytes []byte) (*http.Response, error) {
+	// Recreate body for this attempt (needed for retries)
+	if bodyBytes != nil {
+		req.Body = io.NopCloser(bytes.NewReader(bodyBytes))
+		req.GetBody = func() (io.ReadCloser, error) {
+			return io.NopCloser(bytes.NewReader(bodyBytes)), nil
+		}
+	}
+
+	return c.httpClient.Do(req)
+}
+
+// makeRequestWithRetry executes an HTTP request with 429 rate limit retry logic
+// Implements exponential backoff with jitter and respects Retry-After header
+// Only retries 429 errors; all other errors/statuses are returned immediately
+func (c *Client) makeRequestWithRetry(ctx context.Context, req *http.Request, bodyBytes []byte) (*http.Response, error) {
+	// Determine deadline for timeout checks
+	deadline, hasDeadline := ctx.Deadline()
+	if !hasDeadline {
+		// Fallback to 8-minute timeout (should not happen with httpClient.Timeout set)
+		deadline = time.Now().Add(8 * time.Minute)
+	}
+
+	startTime := time.Now()
+	attempt := 0
+	var lastResp *http.Response
+
+	for {
+		// Check if we've exceeded the deadline
+		if time.Now().After(deadline) {
+			if lastResp != nil && lastResp.Body != nil {
+				lastResp.Body.Close()
+			}
+			return nil, fmt.Errorf("request timed out after %d attempts and %v: rate limited (429)",
+				attempt, time.Since(startTime))
+		}
+
+		attempt++
+
+		// Execute the request
+		resp, err := c.executeRequest(ctx, req, bodyBytes)
+
+		// For non-HTTP errors (network, DNS, etc.), return immediately - don't retry
+		if err != nil {
+			return nil, err
+		}
+
+		// For non-429 responses, return immediately
+		if resp.StatusCode != http.StatusTooManyRequests {
+			return resp, nil
+		}
+
+		// We have a 429 - prepare to retry
+		lastResp = resp
+
+		// Close response body to free resources
+		io.Copy(io.Discard, resp.Body)
+		resp.Body.Close()
+
+		// Calculate retry delay (Retry-After or exponential backoff)
+		delay := calculateRetryDelay(resp, attempt, deadline)
+
+		// Check if delay would exceed deadline
+		if time.Now().Add(delay).After(deadline) {
+			return nil, fmt.Errorf("rate limit retry delay (%v) would exceed timeout after %d attempts",
+				delay, attempt)
+		}
+
+		// Log retry attempt
+		retryAfter := resp.Header.Get("Retry-After")
+		if attempt <= 3 {
+			tflog.Debug(ctx, "Rate limited, retrying", map[string]interface{}{
+				"attempt":       attempt,
+				"delay_seconds": delay.Seconds(),
+				"retry_after":   retryAfter,
+				"method":        req.Method,
+				"path":          req.URL.Path,
+			})
+		} else {
+			tflog.Warn(ctx, "Sustained rate limiting", map[string]interface{}{
+				"attempt":       attempt,
+				"delay_seconds": delay.Seconds(),
+				"retry_after":   retryAfter,
+				"elapsed":       time.Since(startTime).Seconds(),
+				"method":        req.Method,
+				"path":          req.URL.Path,
+			})
+		}
+
+		// Wait before retry with context cancellation support
+		timer := time.NewTimer(delay)
+		select {
+		case <-timer.C:
+			// Continue to next retry
+		case <-ctx.Done():
+			timer.Stop()
+			return nil, fmt.Errorf("request cancelled during rate limit retry: %w", ctx.Err())
+		}
+	}
+}
 
 // handleResponse processes an HTTP response and handles errors
 func (c *Client) handleResponse(resp *http.Response, result interface{}) error {
