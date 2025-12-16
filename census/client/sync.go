@@ -31,11 +31,11 @@ type Sync struct {
 	Operation     string              `json:"operation,omitempty"` // mirror, upsert, append, etc.
 
 	// Scheduling configuration from API response
-	ScheduleFrequency string `json:"schedule_frequency,omitempty"`
-	ScheduleDay       *int   `json:"schedule_day,omitempty"`
-	ScheduleHour      *int   `json:"schedule_hour,omitempty"`
-	ScheduleMinute    *int   `json:"schedule_minute,omitempty"`
-	CronExpression    string `json:"cron_expression,omitempty"`
+	ScheduleFrequency string  `json:"schedule_frequency,omitempty"`
+	ScheduleDay       *string `json:"schedule_day,omitempty"`
+	ScheduleHour      *int    `json:"schedule_hour,omitempty"`
+	ScheduleMinute    *int    `json:"schedule_minute,omitempty"`
+	CronExpression    string  `json:"cron_expression,omitempty"`
 
 	// For terraform config - keep existing schedule structure
 	Schedule *SyncSchedule `json:"schedule,omitempty"`
