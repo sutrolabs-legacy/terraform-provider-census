@@ -68,7 +68,8 @@ resource "census_destination" "intercom" {
 In addition to all arguments above, the following attributes are exported:
 
 * `id` - The ID of the destination.
-* `connection_status` - The current connection status of the destination.
+* `status` - The current status of the destination.
+* `test_status` - The test status of the destination connection.
 
 ## Import
 
@@ -86,6 +87,6 @@ terraform import census_destination.salesforce "12345:67890"
 
 ## Notes
 
-* The `credentials` field is marked as sensitive and will not be displayed in Terraform output.
+* The `connection_config` field is marked as sensitive and will not be displayed in Terraform output.
 * Destination types and required credential fields are validated against the Census API's `/connectors` endpoint.
 * The provider automatically refreshes destination metadata after creation to discover available objects.

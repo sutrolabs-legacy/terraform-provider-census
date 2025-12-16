@@ -97,7 +97,8 @@ resource "census_source" "postgres" {
 In addition to all arguments above, the following attributes are exported:
 
 * `id` - The ID of the source.
-* `connection_status` - The current connection status of the source.
+* `status` - The current status of the source.
+* `test_status` - The test status of the source connection.
 
 ## Import
 
@@ -115,6 +116,6 @@ terraform import census_source.warehouse "12345:67890"
 
 ## Notes
 
-* The `credentials` field is marked as sensitive and will not be displayed in Terraform output.
+* The `connection_config` field is marked as sensitive and will not be displayed in Terraform output.
 * Source types and required credential fields are validated against the Census API's `/source_types` endpoint.
 * After creation, the provider automatically triggers a table refresh to discover available tables.
