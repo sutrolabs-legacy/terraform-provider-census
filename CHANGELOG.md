@@ -10,6 +10,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 - **[PLANNED]** Migrate `field_mapping` from TypeList to TypeSet for true order independence. This will cause a one-time diff showing all mappings as "replaced" during upgrade, but eliminates all future order-related drift. The migration is automatic and safe - mappings are keyed by destination field ("to") which is unique per sync. Users will see a large but harmless diff on first upgrade.
 
+## [0.2.7] - 2025-12-16
+
+### Removed
+- **BREAKING**: Removed `type = "hash"` as a valid field mapping type. This option was never implemented in the Census API and had no functional effect (it was treated identically to `type = "direct"`). Any configurations using `type = "hash"` should be changed to `type = "direct"` or simply omit the type field (direct is the default).
+
+### Fixed
+- **Documentation**: Fixed extensive drift in resource documentation where examples didn't match actual provider implementation:
+  - **sync resource**: Fixed all examples to use correct block syntax instead of `jsonencode()`, changed `name` to `label`, fixed `destination_object` to `destination_attributes` block, fixed `field_mapping` and `alert` from array syntax to multiple blocks
+  - **destination resource**: Fixed field references from `credentials` to `connection_config`, updated exported attributes from `connection_status` to `status` and `test_status`
+  - **source resource**: Fixed field references from `credentials` to `connection_config`, updated exported attributes from `connection_status` to `status` and `test_status`
+  - Added Google Sheets sync example demonstrating mirror operation with auto-mapping
+
 ## [0.2.6] - 2025-12-16
 
 ### Fixed
