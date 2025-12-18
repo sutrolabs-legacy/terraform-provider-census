@@ -1,5 +1,5 @@
 BINARY_NAME=terraform-provider-census
-VERSION=0.2.4
+VERSION=0.2.7
 BUILD_DIR=bin
 LDFLAGS=-ldflags "-X main.version=${VERSION}"
 

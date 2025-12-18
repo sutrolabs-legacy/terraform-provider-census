@@ -148,9 +148,9 @@ func syncSchemaMap(alertCollectionType schema.ValueType) map[string]*schema.Sche
 						Type:        schema.TypeString,
 						Optional:    true,
 						Default:     "direct",
-						Description: "Mapping type: 'direct' (default), 'hash', 'constant', 'sync_metadata', 'segment_membership', or 'liquid_template'.",
+						Description: "Mapping type: 'direct' (default), 'constant', 'sync_metadata', 'segment_membership', or 'liquid_template'.",
 						ValidateFunc: validation.StringInSlice([]string{
-							"direct", "hash", "constant", "sync_metadata", "segment_membership", "liquid_template",
+							"direct", "constant", "sync_metadata", "segment_membership", "liquid_template",
 						}, false),
 					},
 					"constant": {
@@ -1871,7 +1871,7 @@ func ConvertFieldMappingsToMappingAttributes(fieldMappings []client.FieldMapping
 			}
 
 		default:
-			// Default to column mapping (direct or hash)
+			// Default to column mapping (direct)
 			mappingFrom = client.MappingFrom{
 				Type: "column",
 				Data: fm.From,

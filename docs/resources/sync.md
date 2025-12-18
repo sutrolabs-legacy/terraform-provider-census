@@ -8,34 +8,39 @@ Manages a Census sync that moves data from a source (table, dataset, model, etc.
 
 ```hcl
 resource "census_sync" "user_sync" {
-  workspace_id   = census_workspace.main.id
-  name           = "Users to Salesforce"
+  workspace_id = census_workspace.main.id
+  label        = "Users to Salesforce"
 
-  source_attributes = jsonencode({
+  source_attributes {
     connection_id = census_source.warehouse.id
-    object = {
-      type       = "table"
-      table_name = "users"
+    object {
+      type          = "table"
+      table_name    = "users"
+      table_schema  = "demo"
+      table_catalog = "dev"
     }
-  })
+  }
 
-  destination_object = "Contact"
+  destination_attributes {
+    connection_id = census_destination.salesforce.id
+    object        = "Contact"
+  }
 
-  field_mapping = [
-    {
-      from                  = "email"
-      to                    = "Email"
-      is_primary_identifier = true
-    },
-    {
-      from = "first_name"
-      to   = "FirstName"
-    },
-    {
-      from = "last_name"
-      to   = "LastName"
-    },
-  ]
+  field_mapping {
+    from                  = "email"
+    to                    = "Email"
+    is_primary_identifier = true
+  }
+
+  field_mapping {
+    from = "first_name"
+    to   = "FirstName"
+  }
+
+  field_mapping {
+    from = "last_name"
+    to   = "LastName"
+  }
 
   operation = "upsert"
 
@@ -55,30 +60,32 @@ resource "census_sync" "user_sync" {
 
 ```hcl
 resource "census_sync" "high_value_sync" {
-  workspace_id   = census_workspace.main.id
-  name           = "High Value Customers to HubSpot"
+  workspace_id = census_workspace.main.id
+  label        = "High Value Customers to HubSpot"
 
-  source_attributes = jsonencode({
+  source_attributes {
     connection_id = census_source.warehouse.id
-    object = {
+    object {
       type = "dataset"
       id   = census_dataset.high_value_customers.id
     }
-  })
+  }
 
-  destination_object = "contacts"
+  destination_attributes {
+    connection_id = census_destination.hubspot.id
+    object        = "contacts"
+  }
 
-  field_mapping = [
-    {
-      from                  = "email"
-      to                    = "email"
-      is_primary_identifier = true
-    },
-    {
-      from = "lifetime_value"
-      to   = "lifetime_value"
-    },
-  ]
+  field_mapping {
+    from                  = "email"
+    to                    = "email"
+    is_primary_identifier = true
+  }
+
+  field_mapping {
+    from = "lifetime_value"
+    to   = "lifetime_value"
+  }
 
   operation = "upsert"
 
@@ -99,15 +106,15 @@ resource "census_sync" "high_value_sync" {
 
 ```hcl
 resource "census_sync" "vip_segment_sync" {
-  workspace_id   = census_workspace.main.id
-  name           = "VIP Users Segment to Salesforce"
+  workspace_id = census_workspace.main.id
+  label        = "VIP Users Segment to Salesforce"
 
   source_attributes {
-    connection_id     = 829
-    filter_segment_id = 3060  # The segment ID
+    connection_id = 829
     object {
-      type = "dataset"
-      id   = "5951"  # The dataset ID that the segment belongs to
+      type       = "segment"
+      id         = "3060"      # The segment ID
+      dataset_id = "5951"      # The dataset ID that the segment belongs to
     }
   }
 
@@ -116,21 +123,21 @@ resource "census_sync" "vip_segment_sync" {
     object        = "Contact"
   }
 
-  field_mapping = [
-    {
-      from                  = "email"
-      to                    = "Email"
-      is_primary_identifier = true
-    },
-    {
-      from = "first_name"
-      to   = "FirstName"
-    },
-    {
-      from = "last_name"
-      to   = "LastName"
-    },
-  ]
+  field_mapping {
+    from                  = "email"
+    to                    = "Email"
+    is_primary_identifier = true
+  }
+
+  field_mapping {
+    from = "first_name"
+    to   = "FirstName"
+  }
+
+  field_mapping {
+    from = "last_name"
+    to   = "LastName"
+  }
 
   operation = "upsert"
 
@@ -147,69 +154,39 @@ resource "census_sync" "vip_segment_sync" {
 }
 ```
 
-### Sync with Hash Operation
-
-```hcl
-resource "census_sync" "secure_sync" {
-  workspace_id   = census_workspace.main.id
-  name           = "Hashed Email Sync"
-
-  source_attributes = jsonencode({
-    connection_id = census_source.warehouse.id
-    object = {
-      type       = "table"
-      table_name = "users"
-    }
-  })
-
-  destination_object = "user"
-
-  field_mapping = [
-    {
-      from                  = "id"
-      to                    = "userId"
-      is_primary_identifier = true
-    },
-    {
-      from = "email"
-      to   = "email_hash"
-      type = "hash"
-    },
-  ]
-
-  operation = "upsert"
-}
-```
-
 ### Sync with Constant Value
 
 ```hcl
 resource "census_sync" "tagged_sync" {
-  workspace_id   = census_workspace.main.id
-  name           = "Tagged Contact Sync"
+  workspace_id = census_workspace.main.id
+  label        = "Tagged Contact Sync"
 
-  source_attributes = jsonencode({
+  source_attributes {
     connection_id = census_source.warehouse.id
-    object = {
-      type       = "table"
-      table_name = "users"
+    object {
+      type          = "table"
+      table_name    = "users"
+      table_schema  = "demo"
+      table_catalog = "dev"
     }
-  })
+  }
 
-  destination_object = "Contact"
+  destination_attributes {
+    connection_id = census_destination.salesforce.id
+    object        = "Contact"
+  }
 
-  field_mapping = [
-    {
-      from                  = "email"
-      to                    = "Email"
-      is_primary_identifier = true
-    },
-    {
-      type     = "constant"
-      constant = "Terraform Managed"
-      to       = "LeadSource"
-    },
-  ]
+  field_mapping {
+    from                  = "email"
+    to                    = "Email"
+    is_primary_identifier = true
+  }
+
+  field_mapping {
+    type     = "constant"
+    constant = "Terraform Managed"
+    to       = "LeadSource"
+  }
 
   operation = "upsert"
 }
@@ -219,36 +196,41 @@ resource "census_sync" "tagged_sync" {
 
 ```hcl
 resource "census_sync" "metadata_sync" {
-  workspace_id   = census_workspace.main.id
-  name           = "Sync with Metadata Tracking"
+  workspace_id = census_workspace.main.id
+  label        = "Sync with Metadata Tracking"
 
-  source_attributes = jsonencode({
+  source_attributes {
     connection_id = census_source.warehouse.id
-    object = {
-      type       = "table"
-      table_name = "users"
+    object {
+      type          = "table"
+      table_name    = "users"
+      table_schema  = "demo"
+      table_catalog = "dev"
     }
-  })
+  }
 
-  destination_object = "Contact"
+  destination_attributes {
+    connection_id = census_destination.salesforce.id
+    object        = "Contact"
+  }
 
-  field_mapping = [
-    {
-      from                  = "email"
-      to                    = "Email"
-      is_primary_identifier = true
-    },
-    {
-      from = "first_name"
-      to   = "FirstName"
-    },
-    {
-      # Map Census sync_run_id to a custom field
-      type             = "sync_metadata"
-      sync_metadata_key = "sync_run_id"
-      to               = "Last_Sync_Run_ID__c"
-    },
-  ]
+  field_mapping {
+    from                  = "email"
+    to                    = "Email"
+    is_primary_identifier = true
+  }
+
+  field_mapping {
+    from = "first_name"
+    to   = "FirstName"
+  }
+
+  field_mapping {
+    # Map Census sync_run_id to a custom field
+    type              = "sync_metadata"
+    sync_metadata_key = "sync_run_id"
+    to                = "Last_Sync_Run_ID__c"
+  }
 
   operation = "upsert"
 }
@@ -258,32 +240,36 @@ resource "census_sync" "metadata_sync" {
 
 ```hcl
 resource "census_sync" "segment_sync" {
-  workspace_id   = census_workspace.main.id
-  name           = "Sync with Segment Data"
+  workspace_id = census_workspace.main.id
+  label        = "Sync with Segment Data"
 
-  source_attributes = jsonencode({
+  source_attributes {
     connection_id = census_source.warehouse.id
-    object = {
-      type       = "table"
-      table_name = "users"
+    object {
+      type          = "table"
+      table_name    = "users"
+      table_schema  = "demo"
+      table_catalog = "dev"
     }
-  })
+  }
 
-  destination_object = "Contact"
+  destination_attributes {
+    connection_id = census_destination.salesforce.id
+    object        = "Contact"
+  }
 
-  field_mapping = [
-    {
-      from                  = "email"
-      to                    = "Email"
-      is_primary_identifier = true
-    },
-    {
-      # Map segment membership information
-      type              = "segment_membership"
-      segment_identify_by = "name"
-      to                = "Active_Segments__c"
-    },
-  ]
+  field_mapping {
+    from                  = "email"
+    to                    = "Email"
+    is_primary_identifier = true
+  }
+
+  field_mapping {
+    # Map segment membership information
+    type                = "segment_membership"
+    segment_identify_by = "name"
+    to                  = "Active_Segments__c"
+  }
 
   operation = "upsert"
 }
@@ -293,36 +279,41 @@ resource "census_sync" "segment_sync" {
 
 ```hcl
 resource "census_sync" "template_sync" {
-  workspace_id   = census_workspace.main.id
-  name           = "Sync with Field Transformations"
+  workspace_id = census_workspace.main.id
+  label        = "Sync with Field Transformations"
 
-  source_attributes = jsonencode({
+  source_attributes {
     connection_id = census_source.warehouse.id
-    object = {
-      type       = "table"
-      table_name = "users"
+    object {
+      type          = "table"
+      table_name    = "users"
+      table_schema  = "demo"
+      table_catalog = "dev"
     }
-  })
+  }
 
-  destination_object = "Contact"
+  destination_attributes {
+    connection_id = census_destination.salesforce.id
+    object        = "Contact"
+  }
 
-  field_mapping = [
-    {
-      from                  = "email"
-      to                    = "Email"
-      is_primary_identifier = true
-    },
-    {
-      from = "first_name"
-      to   = "FirstName"
-    },
-    {
-      # Use Liquid template to transform data
-      type           = "liquid_template"
-      liquid_template = "{{ record['status'] | upcase }}"
-      to             = "Account_Status__c"
-    },
-  ]
+  field_mapping {
+    from                  = "email"
+    to                    = "Email"
+    is_primary_identifier = true
+  }
+
+  field_mapping {
+    from = "first_name"
+    to   = "FirstName"
+  }
+
+  field_mapping {
+    # Use Liquid template to transform data
+    type            = "liquid_template"
+    liquid_template = "{{ record['status'] | upcase }}"
+    to              = "Account_Status__c"
+  }
 
   operation = "upsert"
 }
@@ -332,18 +323,23 @@ resource "census_sync" "template_sync" {
 
 ```hcl
 resource "census_sync" "auto_sync" {
-  workspace_id   = census_workspace.main.id
-  name           = "Auto-Mapped Users Sync"
+  workspace_id = census_workspace.main.id
+  label        = "Auto-Mapped Users Sync"
 
-  source_attributes = jsonencode({
+  source_attributes {
     connection_id = census_source.warehouse.id
-    object = {
-      type       = "table"
-      table_name = "users"
+    object {
+      type          = "table"
+      table_name    = "users"
+      table_schema  = "demo"
+      table_catalog = "dev"
     }
-  })
+  }
 
-  destination_object = "Contact"
+  destination_attributes {
+    connection_id = census_destination.salesforce.id
+    object        = "Contact"
+  }
 
   # Automatically sync all properties from source to destination
   field_behavior      = "sync_all_properties"
@@ -351,13 +347,11 @@ resource "census_sync" "auto_sync" {
   field_order         = "mapping_order"
 
   # Only need to define the primary identifier when using sync_all_properties
-  field_mapping = [
-    {
-      from                  = "email"
-      to                    = "Email"
-      is_primary_identifier = true
-    },
-  ]
+  field_mapping {
+    from                  = "email"
+    to                    = "Email"
+    is_primary_identifier = true
+  }
 
   operation = "upsert"
 
@@ -374,39 +368,85 @@ resource "census_sync" "auto_sync" {
 }
 ```
 
+### Sync to Google Sheets (Mirror with Auto-Mapping)
+
+```hcl
+resource "census_sync" "sheets_sync" {
+  workspace_id = census_workspace.main.id
+  label        = "Data Export to Google Sheets"
+
+  source_attributes {
+    connection_id = census_source.warehouse.id
+    object {
+      type          = "table"
+      table_name    = "users"
+      table_schema  = "demo"
+      table_catalog = "dev"
+    }
+  }
+
+  destination_attributes {
+    connection_id = census_destination.google_sheets.id
+    # Google Sheets object format: JSON with spreadsheet_id and sheet_id
+    object        = "{\"spreadsheet_id\":\"1r9HavWIo-CS14sblFl-Kxa2kVbMGlqWIBDU6Hb_W8sA\",\"sheet_id\":0}"
+  }
+
+  operation = "mirror"
+
+  # Automatically sync all properties - no primary identifier needed for Google Sheets mirror
+  field_behavior = "sync_all_properties"
+  field_normalization = "match_source_names"
+
+  run_mode {
+    type = "triggered"
+    triggers {
+      schedule {
+        frequency = "daily"
+        hour      = 6
+        minute    = 0
+      }
+    }
+  }
+}
+```
+
 ### Sync with Lookup Field (Foreign Key Relationship)
 
 ```hcl
 resource "census_sync" "user_list_sync" {
-  workspace_id   = census_workspace.main.id
-  name           = "Users to Google Ads Customer Match"
+  workspace_id = census_workspace.main.id
+  label        = "Users to Google Ads Customer Match"
 
-  source_attributes = jsonencode({
+  source_attributes {
     connection_id = census_source.warehouse.id
-    object = {
-      type       = "table"
-      table_name = "users"
+    object {
+      type          = "table"
+      table_name    = "users"
+      table_schema  = "demo"
+      table_catalog = "dev"
     }
-  })
+  }
 
-  destination_object = "user_data"
+  destination_attributes {
+    connection_id = census_destination.google_ads.id
+    object        = "user_data"
+  }
 
-  field_mapping = [
-    {
-      from                  = "email"
-      to                    = "user_identifier.hashed_email"
-      is_primary_identifier = true
-    },
-    {
-      # Map a constant value to user_list_id via lookup
-      # This looks up the user_list record where id = "6600827417"
-      type          = "constant"
-      constant      = "6600827417"
-      to            = "user_list_id"
-      lookup_object = "user_list"
-      lookup_field  = "id"
-    },
-  ]
+  field_mapping {
+    from                  = "email"
+    to                    = "user_identifier.hashed_email"
+    is_primary_identifier = true
+  }
+
+  field_mapping {
+    # Map a constant value to user_list_id via lookup
+    # This looks up the user_list record where id = "6600827417"
+    type          = "constant"
+    constant      = "6600827417"
+    to            = "user_list_id"
+    lookup_object = "user_list"
+    lookup_field  = "id"
+  }
 
   operation = "mirror"
 
@@ -426,28 +466,29 @@ resource "census_sync" "user_list_sync" {
 
 ```hcl
 resource "census_sync" "blob_storage_sync" {
-  workspace_id   = census_workspace.main.id
-  name           = "Users to Azure Blob Storage"
+  workspace_id = census_workspace.main.id
+  label        = "Users to Azure Blob Storage"
 
-  source_attributes = jsonencode({
+  source_attributes {
     connection_id = census_source.warehouse.id
-    object = {
-      type  = "model"
-      id    = "21130"
+    object {
+      type = "model"
+      id   = "21130"
     }
-  })
+  }
 
-  destination_object = "path_to_file/data_%m-%d-%y.parquet"
+  destination_attributes {
+    connection_id = census_destination.azure_blob.id
+    object        = "path_to_file/data_%m-%d-%y.parquet"
+  }
 
-  field_mapping = [
-    {
-      from = "email"
-      to   = "EMAIL"
-    },
-  ]
+  field_mapping {
+    from = "email"
+    to   = "EMAIL"
+  }
 
-  operation     = "mirror"
-  field_behavior = "sync_all_properties"
+  operation           = "mirror"
+  field_behavior      = "sync_all_properties"
   field_normalization = "match_source_names"
 
   # Advanced configuration for file export
@@ -473,72 +514,77 @@ resource "census_sync" "blob_storage_sync" {
 
 ```hcl
 resource "census_sync" "monitored_sync" {
-  workspace_id   = census_workspace.main.id
-  name           = "High-Priority Customer Sync with Alerts"
+  workspace_id = census_workspace.main.id
+  label        = "High-Priority Customer Sync with Alerts"
 
-  source_attributes = jsonencode({
+  source_attributes {
     connection_id = census_source.warehouse.id
-    object = {
-      type       = "table"
-      table_name = "customers"
+    object {
+      type          = "table"
+      table_name    = "users"
+      table_schema  = "demo"
+      table_catalog = "dev"
     }
-  })
+  }
 
-  destination_object = "Contact"
+  destination_attributes {
+    connection_id = census_destination.salesforce.id
+    object        = "Contact"
+  }
 
-  field_mapping = [
-    {
-      from                  = "email"
-      to                    = "Email"
-      is_primary_identifier = true
-    },
-    {
-      from = "name"
-      to   = "Name"
-    },
-  ]
+  field_mapping {
+    from                  = "email"
+    to                    = "Email"
+    is_primary_identifier = true
+  }
+
+  field_mapping {
+    from = "name"
+    to   = "Name"
+  }
 
   operation = "upsert"
 
   # Configure multiple alerts
-  alert = [
-    {
-      # Alert when sync fails completely
-      type                 = "FailureAlertConfiguration"
-      send_for             = "first_time"
-      should_send_recovery = true
-      options              = {}
-    },
-    {
-      # Alert when more than 50% of records are invalid
-      type                 = "InvalidRecordPercentAlertConfiguration"
-      send_for             = "every_time"
-      should_send_recovery = true
-      options = {
-        threshold = "50"
-      }
-    },
-    {
-      # Alert when sync runtime exceeds 30 minutes
-      type                 = "RuntimeAlertConfiguration"
-      send_for             = "first_time"
-      should_send_recovery = false
-      options = {
-        threshold  = "30"
-        unit       = "minutes"
-        start_type = "actual"
-      }
-    },
-    {
-      # Alert on sync completion
-      type                 = "StatusAlertConfiguration"
-      send_for             = "every_time"
-      should_send_recovery = false
-      options = {
-        status_name = "completed"
-      }
-    },
-  ]
+  alert {
+    # Alert when sync fails completely
+    type                 = "FailureAlertConfiguration"
+    send_for             = "first_time"
+    should_send_recovery = true
+    options              = {}
+  }
+
+  alert {
+    # Alert when more than 50% of records are invalid
+    type                 = "InvalidRecordPercentAlertConfiguration"
+    send_for             = "every_time"
+    should_send_recovery = true
+    options = {
+      threshold = "50"
+    }
+  }
+
+  alert {
+    # Alert when sync runtime exceeds 30 minutes
+    type                 = "RuntimeAlertConfiguration"
+    send_for             = "first_time"
+    should_send_recovery = false
+    options = {
+      threshold  = "30"
+      unit       = "minutes"
+      start_type = "actual"
+    }
+  }
+
+  alert {
+    # Alert on sync completion
+    type                 = "StatusAlertConfiguration"
+    send_for             = "every_time"
+    should_send_recovery = false
+    options = {
+      status_name = "completed"
+    }
+  }
 
   run_mode {
     type = "triggered"
@@ -556,30 +602,34 @@ resource "census_sync" "monitored_sync" {
 
 ```hcl
 resource "census_sync" "mirror_sync" {
-  workspace_id   = census_workspace.main.id
-  name           = "Product Catalog Mirror"
+  workspace_id = census_workspace.main.id
+  label        = "Product Catalog Mirror"
 
-  source_attributes = jsonencode({
+  source_attributes {
     connection_id = census_source.warehouse.id
-    object = {
-      type       = "table"
-      table_name = "products"
+    object {
+      type          = "table"
+      table_name    = "users"
+      table_schema  = "demo"
+      table_catalog = "dev"
     }
-  })
+  }
 
-  destination_object = "Product2"
+  destination_attributes {
+    connection_id = census_destination.salesforce.id
+    object        = "Product2"
+  }
 
-  field_mapping = [
-    {
-      from                  = "product_id"
-      to                    = "ProductCode"
-      is_primary_identifier = true
-    },
-    {
-      from = "name"
-      to   = "Name"
-    },
-  ]
+  field_mapping {
+    from                  = "product_id"
+    to                    = "ProductCode"
+    is_primary_identifier = true
+  }
+
+  field_mapping {
+    from = "name"
+    to   = "Name"
+  }
 
   operation = "mirror"
 
@@ -600,34 +650,39 @@ resource "census_sync" "mirror_sync" {
 
 ```hcl
 resource "census_sync" "incremental_append" {
-  workspace_id   = census_workspace.main.id
-  name           = "Incremental Event Log Sync"
+  workspace_id = census_workspace.main.id
+  label        = "Incremental Event Log Sync"
 
-  source_attributes = jsonencode({
+  source_attributes {
     connection_id = census_source.warehouse.id
-    object = {
-      type       = "table"
-      table_name = "event_logs"
+    object {
+      type          = "table"
+      table_name    = "users"
+      table_schema  = "demo"
+      table_catalog = "dev"
     }
-  })
+  }
 
-  destination_object = "Event__c"
+  destination_attributes {
+    connection_id = census_destination.salesforce.id
+    object        = "Event__c"
+  }
 
-  field_mapping = [
-    {
-      from                  = "event_id"
-      to                    = "Event_ID__c"
-      is_primary_identifier = true
-    },
-    {
-      from = "event_name"
-      to   = "Name"
-    },
-    {
-      from = "updated_at"
-      to   = "Updated_At__c"
-    },
-  ]
+  field_mapping {
+    from                  = "event_id"
+    to                    = "Event_ID__c"
+    is_primary_identifier = true
+  }
+
+  field_mapping {
+    from = "event_name"
+    to   = "Name"
+  }
+
+  field_mapping {
+    from = "updated_at"
+    to   = "Updated_At__c"
+  }
 
   operation = "append"
 
@@ -651,43 +706,49 @@ resource "census_sync" "incremental_append" {
 
 ```hcl
 resource "census_sync" "preserve_example" {
-  workspace_id   = census_workspace.main.id
-  name           = "Customer Sync with Field Preservation"
+  workspace_id = census_workspace.main.id
+  label        = "Customer Sync with Field Preservation"
 
-  source_attributes = jsonencode({
+  source_attributes {
     connection_id = census_source.warehouse.id
-    object = {
-      type       = "table"
-      table_name = "customers"
+    object {
+      type          = "table"
+      table_name    = "users"
+      table_schema  = "demo"
+      table_catalog = "dev"
     }
-  })
+  }
 
-  destination_object = "Contact"
+  destination_attributes {
+    connection_id = census_destination.salesforce.id
+    object        = "Contact"
+  }
 
-  field_mapping = [
-    {
-      from                  = "email"
-      to                    = "Email"
-      is_primary_identifier = true
-    },
-    {
-      from = "first_name"
-      to   = "FirstName"
-    },
-    {
-      # Don't overwrite existing phone numbers in destination
-      from            = "phone"
-      to              = "Phone"
-      preserve_values = true
-      sync_null_values = false  # Don't sync null phone values
-    },
-    {
-      # Generate a custom field in the destination
-      from           = "customer_tier"
-      to             = "Customer_Tier__c"
-      generate_field = true
-    },
-  ]
+  field_mapping {
+    from                  = "email"
+    to                    = "Email"
+    is_primary_identifier = true
+  }
+
+  field_mapping {
+    from = "first_name"
+    to   = "FirstName"
+  }
+
+  field_mapping {
+    # Don't overwrite existing phone numbers in destination
+    from             = "phone"
+    to               = "Phone"
+    preserve_values  = true # Don't overwrite existing data in the destination
+    sync_null_values = false  # Don't sync null phone values
+  }
+
+  field_mapping {
+    # Generate a custom field in the destination
+    from           = "customer_tier"
+    to             = "Customer_Tier__c"
+    generate_field = true
+  }
 
   operation = "upsert"
 
@@ -707,23 +768,23 @@ resource "census_sync" "preserve_example" {
 ## Argument Reference
 
 * `workspace_id` - (Required, Forces new resource) The ID of the workspace this sync belongs to.
-* `name` - (Required) The name of the sync.
-* `source_attributes` - (Required) Configuration block for the source. Must include:
+* `label` - (Required) The label of the sync.
+* `source_attributes` - (Required) Configuration block for the source. Block contains:
   * `connection_id` - (Required) The source connection ID
-  * `filter_segment_id` - (Optional) The filter segment ID. When using a segment source, set this to the segment ID and set `object.type` to `"dataset"` with `object.id` as the dataset ID that the segment belongs to.
   * `object` - (Required) Object configuration block:
     * `type` - (Required) Source type: `"table"`, `"dataset"`, `"model"`, `"topic"`, `"segment"`, or `"cohort"`
-    * For table sources: `table_name`, optionally `table_schema` and `table_catalog`
-    * For dataset/model/segment sources: `id` of the dataset/model
-    * For segment sources specifically: use `type="dataset"` and provide the dataset `id`, then specify the segment via the top-level `filter_segment_id` field
+    * For table sources: `table_name`, `table_schema`, and `table_catalog`
+    * For dataset/model sources: `id` of the dataset/model
+    * For segment sources: use `type="segment"`, provide the segment `id`, and specify `dataset_id` for the dataset the segment belongs to
+    * For cohort sources: use `type="cohort"`, provide the cohort `id`, and specify `dataset_id` for the dataset the cohort belongs to
 * `destination_attributes` - (Required) Destination configuration block:
   * `connection_id` - (Required) The destination connection ID
   * `object` - (Required) The destination object name (e.g., "Contact" for Salesforce, "contacts" for HubSpot)
   * `lead_union_insert_to` - (Optional) Where to insert a union object (for Salesforce connections only)
-* `field_mapping` - (Optional) Set of field mappings between source and destination. Each mapping includes:
-  * `from` - Source field name (required for `type="direct"` or `type="hash"`). Omit for `constant`, `sync_metadata`, `segment_membership`, and `liquid_template` mappings.
+* `field_mapping` - (Optional) Field mappings between source and destination. Define multiple `field_mapping` blocks for multiple mappings. Each mapping block includes:
+  * `from` - Source field name (required for `type="direct"`). Omit for `constant`, `sync_metadata`, `segment_membership`, and `liquid_template` mappings.
   * `to` - Destination field name (required)
-  * `type` - Mapping type: `"direct"` (default), `"hash"`, `"constant"`, `"sync_metadata"`, `"segment_membership"`, or `"liquid_template"`.
+  * `type` - Mapping type: `"direct"` (default), `"constant"`, `"sync_metadata"`, `"segment_membership"`, or `"liquid_template"`.
   * `constant` - Constant value (must also set `type="constant"`)
   * `sync_metadata_key` - Sync metadata key (e.g., `"sync_run_id"`). Must also set `type="sync_metadata"`.
   * `segment_identify_by` - How to identify segments (e.g., `"name"`). Must also set `type="segment_membership"`.
@@ -763,7 +824,7 @@ resource "census_sync" "preserve_example" {
   * `"sync_updates_and_deletes"` - Incrementally syncs changes by inserting new records, updating modified records, and deleting records that no longer exist in the source. This is the most common and efficient strategy for keeping destinations in sync (default).
   * `"sync_updates_and_nulls"` - Updates existing records and sets fields to null when the source contains null values, without performing deletes.
   * `"upload_and_swap"` - Replaces the entire destination table with the current source snapshot. Useful for destinations that don't support incremental updates or when you need a complete refresh.
-* `alert` - (Optional) Set of alert configurations for monitoring sync health. Multiple alerts can be configured. Each alert includes:
+* `alert` - (Optional) Alert configurations for monitoring sync health. Define multiple `alert` blocks to configure multiple alerts. Each alert block includes:
   * `type` - (Required) Type of alert. Valid values:
     * `"FailureAlertConfiguration"` - Alert when sync fails completely
     * `"InvalidRecordPercentAlertConfiguration"` - Alert when invalid/rejected records exceed threshold
@@ -829,11 +890,13 @@ terraform import census_sync.user_sync "12345:67890"
 
 ## Notes
 
-* Field mappings use TypeSet to prevent drift from ordering changes returned by the API.
-* The `source_attributes` structure must be OpenAPI compliant with proper table source format.
+* Field mappings are defined as multiple `field_mapping` blocks. The order of field mappings is preserved.
+* The `source_attributes` and `destination_attributes` are configuration blocks, not JSON-encoded strings.
 * Sync operations:
   * `upsert` - Insert new records and update existing ones
   * `append` - Only insert new records, never update
   * `mirror` - Replace all destination records with source data
-* Manual syncs (frequency="manual") must be triggered externally.
+* Manual syncs (frequency="never") must be triggered externally.
 * Source types determine which fields are required in `source_attributes.object`.
+  * For segment sources, use `type="segment"` with `id` (segment ID) and `dataset_id` (parent dataset ID)
+  * For cohort sources, use `type="cohort"` with `id` (cohort ID) and `dataset_id` (parent dataset ID)
