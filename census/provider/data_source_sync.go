@@ -90,7 +90,7 @@ func dataSourceSync() *schema.Resource {
 						"operation": {
 							Type:        schema.TypeString,
 							Computed:    true,
-							Description: "Mapping operation (direct, hash, etc.).",
+							Description: "Mapping operation (direct, constant, sync_metadata, segment_membership, liquid_template).",
 						},
 						"constant": {
 							Type:        schema.TypeString,
