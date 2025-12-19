@@ -12,6 +12,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [0.2.7] - 2025-12-16
 
+### Added
+- **429 Rate Limit Handling**: Automatic retry with exponential backoff for HTTP 429 (Too Many Requests) responses. The provider now intelligently handles rate limiting by:
+  - Respecting `Retry-After` header when provided by the Census API (supports both delay-seconds and HTTP-date formats per RFC 7231)
+  - Using exponential backoff with jitter when Retry-After is not present (1s → 2s → 4s → 8s → 16s → 32s → 64s → 90s max)
+  - Continuing retries for up to 5 minutes (separate from the 1-minute per-request timeout)
+  - Only retrying 429 errors (other errors like 5xx, network failures are not retried and fail immediately)
+  - Providing debug and warning logs for retry attempts via Terraform's structured logging
+  - Gracefully handling context cancellation and deadline exhaustion
 ### Removed
 - **BREAKING**: Removed `type = "hash"` as a valid field mapping type. This option was never implemented in the Census API and had no functional effect (it was treated identically to `type = "direct"`). Any configurations using `type = "hash"` should be changed to `type = "direct"` or simply omit the type field (direct is the default).
 
