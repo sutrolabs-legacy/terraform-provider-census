@@ -1413,3 +1413,121 @@ func TestConvertMappingAttributesToFieldMappings_RoundTrip(t *testing.T) {
 func boolPtr(b bool) *bool {
 	return &b
 }
+
+// ============================================================================
+// MergeFieldMappingsForSyncAll Tests (CustomizeDiff helper)
+// ============================================================================
+
+func TestMergeFieldMappingsForSyncAll_PreservesStateOrder(t *testing.T) {
+	// State has: id, email, first_name (Census auto-generated)
+	// Config has: id (user-configured)
+	// Result should preserve state order, no changes
+	stateMappings := []interface{}{
+		map[string]interface{}{"from": "id", "to": "id", "is_primary_identifier": true},
+		map[string]interface{}{"from": "email", "to": "email"},
+		map[string]interface{}{"from": "first_name", "to": "first_name"},
+	}
+	configMappings := []interface{}{
+		map[string]interface{}{"from": "id", "to": "id", "is_primary_identifier": true},
+	}
+
+	result := provider.MergeFieldMappingsForSyncAll(stateMappings, configMappings)
+
+	if len(result) != 3 {
+		t.Errorf("Expected 3 mappings, got %d", len(result))
+	}
+
+	// Verify order is preserved
+	expectedTos := []string{"id", "email", "first_name"}
+	for i, mapping := range result {
+		m := mapping.(map[string]interface{})
+		if m["to"] != expectedTos[i] {
+			t.Errorf("Position %d: expected 'to'=%s, got %s", i, expectedTos[i], m["to"])
+		}
+	}
+}
+
+func TestMergeFieldMappingsForSyncAll_UserAddsNewMapping(t *testing.T) {
+	// State has: id, email (from Census)
+	// Config has: id, beep_beep (user adds new constant mapping)
+	// Result should have: id, email, beep_beep (new mapping at end)
+	stateMappings := []interface{}{
+		map[string]interface{}{"from": "id", "to": "id", "is_primary_identifier": true},
+		map[string]interface{}{"from": "email", "to": "email"},
+	}
+	configMappings := []interface{}{
+		map[string]interface{}{"from": "id", "to": "id", "is_primary_identifier": true},
+		map[string]interface{}{"type": "constant", "constant": "coolbeans", "to": "beep_beep"},
+	}
+
+	result := provider.MergeFieldMappingsForSyncAll(stateMappings, configMappings)
+
+	if len(result) != 3 {
+		t.Errorf("Expected 3 mappings, got %d", len(result))
+	}
+
+	// New mapping should be at end
+	lastMapping := result[2].(map[string]interface{})
+	if lastMapping["to"] != "beep_beep" {
+		t.Errorf("Expected new mapping 'beep_beep' at end, got %s", lastMapping["to"])
+	}
+	if lastMapping["constant"] != "coolbeans" {
+		t.Errorf("Expected constant 'coolbeans', got %v", lastMapping["constant"])
+	}
+}
+
+func TestMergeFieldMappingsForSyncAll_UserModifiesMapping(t *testing.T) {
+	// State has: id (with from=id)
+	// Config has: id (with from=user_id - user changed it)
+	// Result should use user's version
+	stateMappings := []interface{}{
+		map[string]interface{}{"from": "id", "to": "id", "is_primary_identifier": true},
+	}
+	configMappings := []interface{}{
+		map[string]interface{}{"from": "user_id", "to": "id", "is_primary_identifier": true},
+	}
+
+	result := provider.MergeFieldMappingsForSyncAll(stateMappings, configMappings)
+
+	if len(result) != 1 {
+		t.Errorf("Expected 1 mapping, got %d", len(result))
+	}
+
+	mapping := result[0].(map[string]interface{})
+	if mapping["from"] != "user_id" {
+		t.Errorf("Expected user's 'from'=user_id, got %s", mapping["from"])
+	}
+}
+
+func TestMergeFieldMappingsForSyncAll_EmptyState(t *testing.T) {
+	// State is empty (new resource)
+	// Config has mappings
+	// Result should just be config mappings
+	stateMappings := []interface{}{}
+	configMappings := []interface{}{
+		map[string]interface{}{"from": "id", "to": "id", "is_primary_identifier": true},
+	}
+
+	result := provider.MergeFieldMappingsForSyncAll(stateMappings, configMappings)
+
+	if len(result) != 1 {
+		t.Errorf("Expected 1 mapping, got %d", len(result))
+	}
+}
+
+func TestMergeFieldMappingsForSyncAll_EmptyConfig(t *testing.T) {
+	// State has Census mappings
+	// Config is empty (user doesn't specify any)
+	// Result should preserve all state mappings
+	stateMappings := []interface{}{
+		map[string]interface{}{"from": "id", "to": "id"},
+		map[string]interface{}{"from": "email", "to": "email"},
+	}
+	configMappings := []interface{}{}
+
+	result := provider.MergeFieldMappingsForSyncAll(stateMappings, configMappings)
+
+	if len(result) != 2 {
+		t.Errorf("Expected 2 mappings, got %d", len(result))
+	}
+}

@@ -131,6 +131,7 @@ func syncSchemaMap(alertCollectionType schema.ValueType) map[string]*schema.Sche
 		"field_mapping": {
 			Type:        schema.TypeList,
 			Optional:    true,
+			Computed:    true,
 			Description: "Field mappings between source and destination.",
 			Elem: &schema.Resource{
 				Schema: map[string]*schema.Schema{
@@ -550,6 +551,8 @@ func ResourceSync() *schema.Resource {
 			},
 		},
 
+		CustomizeDiff: customizeSyncFieldMappingDiff,
+
 		Schema: syncSchemaMap(schema.TypeList),
 	}
 }
@@ -588,6 +591,118 @@ func suppressEquivalentJSON(k, old, new string, d *schema.ResourceData) bool {
 	}
 
 	return reflect.DeepEqual(oldJSON, newJSON)
+}
+
+// customizeSyncFieldMappingDiff suppresses field_mapping diffs for Census-managed
+// mappings when field_behavior = "sync_all_properties", while still showing diffs
+// for user-configured mappings.
+func customizeSyncFieldMappingDiff(ctx context.Context, d *schema.ResourceDiff, meta interface{}) error {
+	// Only apply on updates (not creates)
+	if d.Id() == "" {
+		return nil
+	}
+
+	// Only apply when using sync_all_properties mode
+	fieldBehavior := d.Get("field_behavior").(string)
+	if fieldBehavior != "sync_all_properties" {
+		return nil
+	}
+
+	oldRaw, newRaw := d.GetChange("field_mapping")
+	oldMappings, _ := oldRaw.([]interface{})
+	newMappings, _ := newRaw.([]interface{})
+
+	mergedMappings := MergeFieldMappingsForSyncAll(oldMappings, newMappings)
+
+	// Set merged value to suppress diff for Census-managed mappings
+	return d.SetNew("field_mapping", mergedMappings)
+}
+
+// MergeFieldMappingsForSyncAll merges user-configured mappings (from config) with
+// Census-managed mappings (from state) for sync_all_properties mode.
+// It preserves state order, uses user config values where specified, and appends
+// any new user mappings at the end.
+func MergeFieldMappingsForSyncAll(stateMappings, configMappings []interface{}) []interface{} {
+	// Build map of user-configured mappings by "to" field (from config)
+	userConfiguredByTo := make(map[string]interface{})
+	for _, mapping := range configMappings {
+		if m, ok := mapping.(map[string]interface{}); ok {
+			if to, ok := m["to"].(string); ok {
+				userConfiguredByTo[to] = mapping
+			}
+		}
+	}
+
+	// Build merged list preserving state order, but using user config values where specified
+	mergedMappings := make([]interface{}, 0, len(stateMappings))
+
+	// Track which user-configured mappings we've added
+	addedUserMappings := make(map[string]bool)
+
+	// First pass: iterate through state mappings in order
+	for _, stateMapping := range stateMappings {
+		if m, ok := stateMapping.(map[string]interface{}); ok {
+			to, _ := m["to"].(string)
+			if userMapping, exists := userConfiguredByTo[to]; exists {
+				// User configured this mapping - use their version
+				mergedMappings = append(mergedMappings, userMapping)
+				addedUserMappings[to] = true
+			} else if IsCensusManagedMapping(m) {
+				// Census-managed (trivial) mapping - preserve from state
+				mergedMappings = append(mergedMappings, stateMapping)
+			}
+			// If not in config AND not Census-managed, it's a user mapping that was removed - drop it
+		}
+	}
+
+	// Second pass: add any new user-configured mappings not in state
+	for _, mapping := range configMappings {
+		if m, ok := mapping.(map[string]interface{}); ok {
+			if to, ok := m["to"].(string); ok {
+				if !addedUserMappings[to] {
+					// New mapping from user, add it
+					mergedMappings = append(mergedMappings, mapping)
+				}
+			}
+		}
+	}
+
+	return mergedMappings
+}
+
+// IsCensusManagedMapping returns true if the mapping appears to be auto-generated
+// by Census (trivial mapping) vs explicitly configured by user.
+// Trivial mappings have from=to, operation=set, and no customizations.
+func IsCensusManagedMapping(m map[string]interface{}) bool {
+	// Primary identifiers are always user-configured
+	if isPrimary, ok := m["is_primary_identifier"].(bool); ok && isPrimary {
+		return false
+	}
+
+	// Constant mappings are user-configured (no source field)
+	if constant, ok := m["constant"].(string); ok && constant != "" {
+		return false
+	}
+
+	// Liquid template mappings are user-configured
+	if liquid, ok := m["liquid_template"].(string); ok && liquid != "" {
+		return false
+	}
+
+	// Non-default operations are user-configured
+	if op, ok := m["operation"].(string); ok && op != "" && op != "set" {
+		return false
+	}
+
+	// If from != to, it's a user-configured rename
+	from, _ := m["from"].(string)
+	to, _ := m["to"].(string)
+	if from != "" && to != "" && from != to {
+		return false
+	}
+
+	// Trivial mapping: from=X, to=X, operation=set - Census auto-generated
+	return true
 }
 
 func resourceSyncCreate(ctx context.Context, d *schema.ResourceData, meta interface{}) diag.Diagnostics {
