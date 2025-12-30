@@ -1624,12 +1624,14 @@ func TestIsCensusManagedMapping_NonDefaultOperation(t *testing.T) {
 	}
 }
 
-func TestIsCensusManagedMapping_Rename(t *testing.T) {
+func TestIsCensusManagedMapping_RenameIsCensusManaged(t *testing.T) {
+	// Rename mappings (from != to) ARE Census-managed because field_normalization
+	// can auto-generate them (e.g., "beepBoop" -> "beep_boop" with snake_case)
 	m := map[string]interface{}{
 		"from": "source_field",
 		"to":   "destination_field",
 	}
-	if provider.IsCensusManagedMapping(m) {
-		t.Error("Rename mapping (from != to) should NOT be Census-managed")
+	if !provider.IsCensusManagedMapping(m) {
+		t.Error("Rename mapping (from != to) SHOULD be Census-managed (field normalization)")
 	}
 }

@@ -671,8 +671,8 @@ func MergeFieldMappingsForSyncAll(stateMappings, configMappings []interface{}) [
 }
 
 // IsCensusManagedMapping returns true if the mapping appears to be auto-generated
-// by Census (trivial mapping) vs explicitly configured by user.
-// Trivial mappings have from=to, operation=set, and no customizations.
+// by Census vs explicitly configured by user.
+// User-configured mappings have: is_primary_identifier, constant, liquid_template, or non-default operation.
 func IsCensusManagedMapping(m map[string]interface{}) bool {
 	// Primary identifiers are always user-configured
 	if isPrimary, ok := m["is_primary_identifier"].(bool); ok && isPrimary {
@@ -694,14 +694,11 @@ func IsCensusManagedMapping(m map[string]interface{}) bool {
 		return false
 	}
 
-	// If from != to, it's a user-configured rename
-	from, _ := m["from"].(string)
-	to, _ := m["to"].(string)
-	if from != "" && to != "" && from != to {
-		return false
-	}
+	// Note: We do NOT check from != to because Census can auto-generate mappings
+	// with different from/to values when field_normalization is enabled
+	// (e.g., "beepBoop" -> "beep_boop" with snake_case normalization)
 
-	// Trivial mapping: from=X, to=X, operation=set - Census auto-generated
+	// If none of the above, it's a Census-managed mapping
 	return true
 }
 
