@@ -10,6 +10,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 - **[PLANNED]** Migrate `field_mapping` from TypeList to TypeSet for true order independence. This will cause a one-time diff showing all mappings as "replaced" during upgrade, but eliminates all future order-related drift. The migration is automatic and safe - mappings are keyed by destination field ("to") which is unique per sync. Users will see a large but harmless diff on first upgrade.
 
+## [0.2.8] - 2025-12-30
+
+### Fixed
+- **Cron Schedule Drift**: Fixed redundant diffs for syncs using cron expressions. When a sync is created with `frequency = "expression"` and a `cron_expression`, Census API returns computed `day`, `hour`, and `minute` values which caused Terraform to detect configuration drift. The provider now ignores these redundant fields when a cron expression is present.
+
 ## [0.2.7] - 2025-12-16
 
 ### Added
