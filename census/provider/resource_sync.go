@@ -1535,17 +1535,18 @@ func FlattenRunMode(mode *client.SyncMode) []interface{} {
 				"frequency": mode.Triggers.Schedule.Frequency,
 			}
 
-			if mode.Triggers.Schedule.Day != "" {
-				scheduleMap["day"] = mode.Triggers.Schedule.Day
-			}
-			if mode.Triggers.Schedule.Hour != 0 {
-				scheduleMap["hour"] = mode.Triggers.Schedule.Hour
-			}
-			if mode.Triggers.Schedule.Minute != 0 {
-				scheduleMap["minute"] = mode.Triggers.Schedule.Minute
-			}
 			if mode.Triggers.Schedule.CronExpression != "" {
 				scheduleMap["cron_expression"] = mode.Triggers.Schedule.CronExpression
+			} else {
+				if mode.Triggers.Schedule.Day != "" {
+					scheduleMap["day"] = mode.Triggers.Schedule.Day
+				}
+				if mode.Triggers.Schedule.Hour != 0 {
+					scheduleMap["hour"] = mode.Triggers.Schedule.Hour
+				}
+				if mode.Triggers.Schedule.Minute != 0 {
+					scheduleMap["minute"] = mode.Triggers.Schedule.Minute
+				}
 			}
 
 			triggersMap["schedule"] = []interface{}{scheduleMap}
