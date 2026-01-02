@@ -15,6 +15,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 - **Sync Run Mode Drift**: Fixed phantom drift detection for `run_mode` field when users don't specify it in their Terraform configuration. Previously, when `run_mode` was omitted, the Census API would set a default value, causing subsequent `terraform plan` commands to incorrectly show that `run_mode` would be deleted (even though it cannot actually be deleted). The field is now marked as `Computed: true` in addition to `Optional: true`, which tells Terraform that server-side defaults are expected behavior and should not be treated as drift.
 
+## [0.2.8] - 2025-12-30
+
+### Fixed
+- **Cron Schedule Drift**: Fixed redundant diffs for syncs using cron expressions. When a sync is created with `frequency = "expression"` and a `cron_expression`, Census API returns computed `day`, `hour`, and `minute` values which caused Terraform to detect configuration drift. The provider now ignores these redundant fields when a cron expression is present.
+
 ## [0.2.7] - 2025-12-16
 
 ### Added
