@@ -371,9 +371,8 @@ func syncSchemaMap(alertCollectionType schema.ValueType) map[string]*schema.Sche
 		"run_mode": {
 			Type:        schema.TypeList,
 			Optional:    true,
-			Computed:    true,
 			MaxItems:    1,
-			Description: "Run mode configuration for the sync (live vs triggered with various trigger types).",
+			Description: "Run mode configuration for the sync (triggered with various trigger types). If not specified, Census will use a default schedule (manually triggered). To avoid drift, explicitly specify the desired run_mode in your configuration.",
 			Elem: &schema.Resource{
 				Schema: map[string]*schema.Schema{
 					"type": {

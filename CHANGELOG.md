@@ -12,13 +12,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [0.2.9] - 2026-01-02
 
-### Fixed
-- **Sync Run Mode Drift**: Fixed phantom drift detection for `run_mode` field when users don't specify it in their Terraform configuration. Previously, when `run_mode` was omitted, the Census API would set a default value, causing subsequent `terraform plan` commands to incorrectly show that `run_mode` would be deleted (even though it cannot actually be deleted). The field is now marked as `Computed: true` in addition to `Optional: true`, which tells Terraform that server-side defaults are expected behavior and should not be treated as drift.
-
-### Added
-- Acceptance tests verifying `run_mode` drift behavior:
-  - `TestAccResourceSync_RunMode_OmittedNoDrift`: Confirms no drift when `run_mode` is omitted
-  - `TestAccResourceSync_RunMode_Changed`: Confirms changes are detected when explicitly modified
+### Changed
+- **Sync Run Mode Configuration**: The `run_mode` field now follows standard Terraform patterns for optional configuration blocks. Users should explicitly specify `run_mode` in their configuration to manage sync schedules through Terraform. If omitted, Census API will apply defaults (manually triggered), which may appear as drift in subsequent plans. This "what you see is what you get" behavior is consistent with standard Terraform provider patterns and ensures that removing `run_mode` from your configuration correctly shows as a change (reverting to Census defaults).
 
 ## [0.2.8] - 2025-12-30
 
