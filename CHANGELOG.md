@@ -10,11 +10,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 - **[PLANNED]** Migrate `field_mapping` from TypeList to TypeSet for true order independence. This will cause a one-time diff showing all mappings as "replaced" during upgrade, but eliminates all future order-related drift. The migration is automatic and safe - mappings are keyed by destination field ("to") which is unique per sync. Users will see a large but harmless diff on first upgrade.
 
-## [0.2.9] - 2026-01-02
-
-### Changed
-- **Sync Run Mode Configuration**: The `run_mode` field now follows standard Terraform patterns for optional configuration blocks. Users should explicitly specify `run_mode` in their configuration to manage sync schedules through Terraform. If omitted, Census API will apply defaults (manually triggered), which may appear as drift in subsequent plans. This "what you see is what you get" behavior is consistent with standard Terraform provider patterns and ensures that removing `run_mode` from your configuration correctly shows as a change (reverting to Census defaults).
-
 ## [0.2.8] - 2025-12-30
 
 ### Fixed
