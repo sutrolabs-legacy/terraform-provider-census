@@ -10,6 +10,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 - **[PLANNED]** Migrate `field_mapping` from TypeList to TypeSet for true order independence. This will cause a one-time diff showing all mappings as "replaced" during upgrade, but eliminates all future order-related drift. The migration is automatic and safe - mappings are keyed by destination field ("to") which is unique per sync. Users will see a large but harmless diff on first upgrade.
 
+## [0.2.9] - 2025-01-02
+
+### Fixed
+- **Alert Deletion**: Fixed bug preventing deletion of all alerts from a sync resource. Previously, when removing all alert blocks from a sync configuration, the provider would not send the `alert_attributes` field to the Census API, causing the API to preserve existing alerts. The provider now correctly sends `"alert_attributes": []` to delete all alerts when none are configured.
+
 ## [0.2.8] - 2025-12-30
 
 ### Fixed
