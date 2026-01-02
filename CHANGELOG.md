@@ -10,6 +10,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 - **[PLANNED]** Migrate `field_mapping` from TypeList to TypeSet for true order independence. This will cause a one-time diff showing all mappings as "replaced" during upgrade, but eliminates all future order-related drift. The migration is automatic and safe - mappings are keyed by destination field ("to") which is unique per sync. Users will see a large but harmless diff on first upgrade.
 
+## [0.2.9] - 2026-01-02
+
+### Fixed
+- **Sync Run Mode Drift**: Fixed phantom drift detection for `run_mode` field when users don't specify it in their Terraform configuration. Previously, when `run_mode` was omitted, the Census API would set a default value, causing subsequent `terraform plan` commands to incorrectly show that `run_mode` would be deleted (even though it cannot actually be deleted). The field is now marked as `Computed: true` in addition to `Optional: true`, which tells Terraform that server-side defaults are expected behavior and should not be treated as drift.
+
 ## [0.2.7] - 2025-12-16
 
 ### Added
