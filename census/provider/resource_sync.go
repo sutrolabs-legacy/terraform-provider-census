@@ -371,6 +371,7 @@ func syncSchemaMap(alertCollectionType schema.ValueType) map[string]*schema.Sche
 		"run_mode": {
 			Type:        schema.TypeList,
 			Optional:    true,
+			Computed:    true,
 			MaxItems:    1,
 			Description: "Run mode configuration for the sync (live vs triggered with various trigger types).",
 			Elem: &schema.Resource{
