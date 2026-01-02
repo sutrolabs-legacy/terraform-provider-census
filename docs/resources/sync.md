@@ -824,7 +824,7 @@ resource "census_sync" "preserve_example" {
   * `"sync_updates_and_deletes"` - Incrementally syncs changes by inserting new records, updating modified records, and deleting records that no longer exist in the source. This is the most common and efficient strategy for keeping destinations in sync (default).
   * `"sync_updates_and_nulls"` - Updates existing records and sets fields to null when the source contains null values, without performing deletes.
   * `"upload_and_swap"` - Replaces the entire destination table with the current source snapshot. Useful for destinations that don't support incremental updates or when you need a complete refresh.
-* `alert` - (Optional) Alert configurations for monitoring sync health. Define multiple `alert` blocks to configure multiple alerts. Each alert block includes:
+* `alert` - (Optional) Alert configurations for monitoring sync health. Define multiple `alert` blocks to configure multiple alerts. If no `alert` blocks are specified, the sync will be created with no alerts. Each alert block includes:
   * `type` - (Required) Type of alert. Valid values:
     * `"FailureAlertConfiguration"` - Alert when sync fails completely
     * `"InvalidRecordPercentAlertConfiguration"` - Alert when invalid/rejected records exceed threshold

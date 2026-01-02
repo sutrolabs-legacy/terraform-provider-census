@@ -181,8 +181,9 @@ type CreateSyncRequest struct {
 	Mappings              []MappingAttributes    `json:"mappings"`               // Required: Field mappings
 
 	// Optional fields
-	Label           string           `json:"label,omitempty"`
-	AlertAttributes []AlertAttribute `json:"alert_attributes,omitempty"`
+	Label string `json:"label,omitempty"`
+	// Note: No omitempty tag - we need to send empty array to prevent default alerts
+	AlertAttributes []AlertAttribute `json:"alert_attributes"`
 
 	// Schedule fields - Census Management API expects these as flat fields, not nested object
 	ScheduleFrequency string `json:"schedule_frequency,omitempty"`
