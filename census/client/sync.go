@@ -259,7 +259,8 @@ type UpdateSyncRequest struct {
 	MirrorStrategy string `json:"mirror_strategy,omitempty"` // sync_updates_and_deletes, sync_updates_and_nulls, upload_and_swap
 
 	// Alert configuration
-	AlertAttributes []AlertAttribute `json:"alert_attributes,omitempty"`
+	// Note: No omitempty tag - we need to send empty array to delete all alerts
+	AlertAttributes []AlertAttribute `json:"alert_attributes"`
 }
 
 // SyncResponse represents a single sync response

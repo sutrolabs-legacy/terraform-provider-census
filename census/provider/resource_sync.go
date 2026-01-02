@@ -1240,11 +1240,14 @@ func FlattenFieldMappings(mappings []client.FieldMapping) []interface{} {
 }
 
 func ExpandAlerts(alerts []interface{}) []client.AlertAttribute {
-	if len(alerts) == 0 {
-		return nil
-	}
-
+	// Return empty slice instead of nil to allow deleting all alerts
+	// When nil is used, the omitempty tag causes the field to be omitted entirely
+	// from the JSON, which the API interprets as "don't change"
 	result := make([]client.AlertAttribute, 0, len(alerts))
+
+	if len(alerts) == 0 {
+		return result
+	}
 	for i, alert := range alerts {
 		m, ok := alert.(map[string]interface{})
 		if !ok {
