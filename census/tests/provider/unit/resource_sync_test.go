@@ -1593,6 +1593,18 @@ func TestIsCensusManagedMapping_PrimaryIdentifier(t *testing.T) {
 	}
 }
 
+func TestIsCensusManagedMapping_PrimaryIdentifierDirect(t *testing.T) {
+	m := map[string]interface{}{
+		"from":                  "id",
+		"to":                    "id",
+		"is_primary_identifier": true,
+		"type":                  "direct",
+	}
+	if provider.IsCensusManagedMapping(m) {
+		t.Error("Primary identifier with direct type should NOT be Census-managed")
+	}
+}
+
 func TestIsCensusManagedMapping_ConstantMapping(t *testing.T) {
 	m := map[string]interface{}{
 		"constant": "some_value",

@@ -676,7 +676,12 @@ func MergeFieldMappingsForSyncAll(stateMappings, configMappings []interface{}) [
 func IsCensusManagedMapping(m map[string]interface{}) bool {
 	// Primary identifiers with direct type are always user-configured
 	if isPrimary, ok := m["is_primary_identifier"].(bool); ok && isPrimary {
-		if mappingType, ok := m["type"].(string); ok && mappingType == "direct" {
+		// Type defaults to "direct" if not specified
+		mappingType := "direct"
+		if typeVal, ok := m["type"].(string); ok && typeVal != "" {
+			mappingType = typeVal
+		}
+		if mappingType == "direct" {
 			return false
 		}
 	}
