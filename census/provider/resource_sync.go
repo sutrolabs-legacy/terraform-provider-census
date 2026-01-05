@@ -674,9 +674,11 @@ func MergeFieldMappingsForSyncAll(stateMappings, configMappings []interface{}) [
 // by Census vs explicitly configured by user.
 // User-configured mappings have: is_primary_identifier, constant, liquid_template, or non-default operation.
 func IsCensusManagedMapping(m map[string]interface{}) bool {
-	// Primary identifiers are always user-configured
+	// Primary identifiers with direct type are always user-configured
 	if isPrimary, ok := m["is_primary_identifier"].(bool); ok && isPrimary {
-		return false
+		if mappingType, ok := m["type"].(string); ok && mappingType == "direct" {
+			return false
+		}
 	}
 
 	// Constant mappings are user-configured (no source field)
