@@ -352,8 +352,11 @@ func TestExpandAlerts_Basic(t *testing.T) {
 
 func TestExpandAlerts_Empty(t *testing.T) {
 	result := provider.ExpandAlerts([]interface{}{})
-	if result != nil {
-		t.Errorf("ExpandAlerts(empty) should return nil, got %d items", len(result))
+	if result == nil {
+		t.Errorf("ExpandAlerts(empty) should return empty slice, got nil")
+	}
+	if len(result) != 0 {
+		t.Errorf("ExpandAlerts(empty) should return empty slice with 0 items, got %d items", len(result))
 	}
 }
 

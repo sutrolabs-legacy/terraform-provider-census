@@ -181,8 +181,9 @@ type CreateSyncRequest struct {
 	Mappings              []MappingAttributes    `json:"mappings"`               // Required: Field mappings
 
 	// Optional fields
-	Label           string           `json:"label,omitempty"`
-	AlertAttributes []AlertAttribute `json:"alert_attributes,omitempty"`
+	Label string `json:"label,omitempty"`
+	// Note: No omitempty tag - we need to send empty array to prevent default alerts
+	AlertAttributes []AlertAttribute `json:"alert_attributes"`
 
 	// Schedule fields - Census Management API expects these as flat fields, not nested object
 	ScheduleFrequency string `json:"schedule_frequency,omitempty"`
@@ -259,7 +260,8 @@ type UpdateSyncRequest struct {
 	MirrorStrategy string `json:"mirror_strategy,omitempty"` // sync_updates_and_deletes, sync_updates_and_nulls, upload_and_swap
 
 	// Alert configuration
-	AlertAttributes []AlertAttribute `json:"alert_attributes,omitempty"`
+	// Note: No omitempty tag - we need to send empty array to delete all alerts
+	AlertAttributes []AlertAttribute `json:"alert_attributes"`
 }
 
 // SyncResponse represents a single sync response

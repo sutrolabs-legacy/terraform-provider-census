@@ -10,6 +10,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 - **[PLANNED]** Migrate `field_mapping` from TypeList to TypeSet for true order independence. This will cause a one-time diff showing all mappings as "replaced" during upgrade, but eliminates all future order-related drift. The migration is automatic and safe - mappings are keyed by destination field ("to") which is unique per sync. Users will see a large but harmless diff on first upgrade.
 
+## [0.2.9] - 2025-01-02
+
+### Fixed
+- **Alert Management**: Fixed alert lifecycle management to follow Terraform best practices. Previously, the provider would omit the `alert_attributes` field when no alerts were configured, causing the Census API to add default alerts on create and preserve existing alerts on update. The provider now always sends `alert_attributes` (as an empty array when no alerts are configured), ensuring:
+  - Syncs created without alerts have no alerts (no default alerts added)
+  - All alerts can be deleted from a sync by removing all `alert` blocks and applying
+  - Terraform state matches user configuration with no unexpected drift
+
 ## [0.2.8] - 2025-12-30
 
 ### Fixed
