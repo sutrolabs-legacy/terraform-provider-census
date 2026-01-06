@@ -299,6 +299,316 @@ func TestFlattenFieldMappings_Empty(t *testing.T) {
 }
 
 // ============================================================================
+// Field Mapping Ordering Tests
+// ============================================================================
+// These tests verify that field mappings are reordered to match Terraform state
+// order based on the "to" field, preventing spurious diffs when the Census API
+// returns mappings in a different order.
+
+func TestMatchFieldMappingsByTo_PreservesStateOrder(t *testing.T) {
+	// Simulate state with mappings in a specific order
+	stateMappings := []interface{}{
+		map[string]interface{}{
+			"from": "email",
+			"to":   "Email",
+			"type": "direct",
+		},
+		map[string]interface{}{
+			"from": "first_name",
+			"to":   "FirstName",
+			"type": "direct",
+		},
+		map[string]interface{}{
+			"from": "last_name",
+			"to":   "LastName",
+			"type": "direct",
+		},
+	}
+
+	// Simulate API response in different order
+	apiMappings := []client.FieldMapping{
+		{
+			From: "last_name",
+			To:   "LastName",
+			Type: "direct",
+		},
+		{
+			From: "email",
+			To:   "Email",
+			Type: "direct",
+		},
+		{
+			From: "first_name",
+			To:   "FirstName",
+			Type: "direct",
+		},
+	}
+
+	result := provider.MatchFieldMappingsByTo(stateMappings, apiMappings)
+
+	// Verify result matches state order
+	if len(result) != 3 {
+		t.Errorf("Expected 3 mappings, got %d", len(result))
+	}
+
+	expectedOrder := []string{"Email", "FirstName", "LastName"}
+	for i, mapping := range result {
+		if mapping.To != expectedOrder[i] {
+			t.Errorf("Result[%d].To = %s, want %s", i, mapping.To, expectedOrder[i])
+		}
+	}
+}
+
+func TestMatchFieldMappingsByTo_HandlesNewMappings(t *testing.T) {
+	// State has 2 mappings
+	stateMappings := []interface{}{
+		map[string]interface{}{
+			"from": "email",
+			"to":   "Email",
+		},
+		map[string]interface{}{
+			"from": "first_name",
+			"to":   "FirstName",
+		},
+	}
+
+	// API returns 3 mappings (one new)
+	apiMappings := []client.FieldMapping{
+		{
+			From: "email",
+			To:   "Email",
+			Type: "direct",
+		},
+		{
+			From: "last_name",
+			To:   "LastName", // New mapping not in state
+			Type: "direct",
+		},
+		{
+			From: "first_name",
+			To:   "FirstName",
+			Type: "direct",
+		},
+	}
+
+	result := provider.MatchFieldMappingsByTo(stateMappings, apiMappings)
+
+	// Verify result has all 3 mappings
+	if len(result) != 3 {
+		t.Errorf("Expected 3 mappings, got %d", len(result))
+	}
+
+	// First 2 should match state order
+	if result[0].To != "Email" {
+		t.Errorf("Result[0].To = %s, want Email", result[0].To)
+	}
+	if result[1].To != "FirstName" {
+		t.Errorf("Result[1].To = %s, want FirstName", result[1].To)
+	}
+
+	// New mapping should be appended at the end
+	if result[2].To != "LastName" {
+		t.Errorf("Result[2].To = %s, want LastName (new mapping should be at end)", result[2].To)
+	}
+}
+
+func TestMatchFieldMappingsByTo_HandlesRemovedMappings(t *testing.T) {
+	// State has 3 mappings
+	stateMappings := []interface{}{
+		map[string]interface{}{
+			"from": "email",
+			"to":   "Email",
+		},
+		map[string]interface{}{
+			"from": "first_name",
+			"to":   "FirstName",
+		},
+		map[string]interface{}{
+			"from": "last_name",
+			"to":   "LastName",
+		},
+	}
+
+	// API returns only 2 mappings (one removed)
+	apiMappings := []client.FieldMapping{
+		{
+			From: "email",
+			To:   "Email",
+			Type: "direct",
+		},
+		{
+			From: "last_name",
+			To:   "LastName",
+			Type: "direct",
+		},
+	}
+
+	result := provider.MatchFieldMappingsByTo(stateMappings, apiMappings)
+
+	// Verify result has only 2 mappings
+	if len(result) != 2 {
+		t.Errorf("Expected 2 mappings, got %d", len(result))
+	}
+
+	// Should preserve state order for remaining mappings
+	if result[0].To != "Email" {
+		t.Errorf("Result[0].To = %s, want Email", result[0].To)
+	}
+	if result[1].To != "LastName" {
+		t.Errorf("Result[1].To = %s, want LastName", result[1].To)
+	}
+
+	// Verify FirstName was removed
+	for _, mapping := range result {
+		if mapping.To == "FirstName" {
+			t.Errorf("FirstName mapping should have been removed")
+		}
+	}
+}
+
+func TestMatchFieldMappingsByTo_MixedMappingTypes(t *testing.T) {
+	// Test with various mapping types (direct, constant, liquid_template, etc.)
+	stateMappings := []interface{}{
+		map[string]interface{}{
+			"from":                  "email",
+			"to":                    "Email",
+			"type":                  "direct",
+			"is_primary_identifier": true,
+		},
+		map[string]interface{}{
+			"to":       "Source",
+			"type":     "constant",
+			"constant": "Website",
+		},
+		map[string]interface{}{
+			"to":              "SyncRunID",
+			"type":            "sync_metadata",
+			"sync_metadata_key": "sync_run_id",
+		},
+		map[string]interface{}{
+			"to":              "FullName",
+			"type":            "liquid_template",
+			"liquid_template": "{{ first_name }} {{ last_name }}",
+		},
+	}
+
+	// API returns in completely different order
+	apiMappings := []client.FieldMapping{
+		{
+			To:             "FullName",
+			Type:           "liquid_template",
+			LiquidTemplate: "{{ first_name }} {{ last_name }}",
+		},
+		{
+			From:                "email",
+			To:                  "Email",
+			Type:                "direct",
+			IsPrimaryIdentifier: true,
+		},
+		{
+			To:              "SyncRunID",
+			Type:            "sync_metadata",
+			SyncMetadataKey: "sync_run_id",
+		},
+		{
+			To:       "Source",
+			Type:     "constant",
+			Constant: "Website",
+		},
+	}
+
+	result := provider.MatchFieldMappingsByTo(stateMappings, apiMappings)
+
+	// Verify result has all 4 mappings
+	if len(result) != 4 {
+		t.Errorf("Expected 4 mappings, got %d", len(result))
+	}
+
+	// Verify order matches state
+	expectedOrder := []string{"Email", "Source", "SyncRunID", "FullName"}
+	for i, mapping := range result {
+		if mapping.To != expectedOrder[i] {
+			t.Errorf("Result[%d].To = %s, want %s", i, mapping.To, expectedOrder[i])
+		}
+	}
+
+	// Verify types are preserved
+	if result[0].Type != "direct" || !result[0].IsPrimaryIdentifier {
+		t.Errorf("Email mapping should be direct type with primary identifier")
+	}
+	if result[1].Type != "constant" {
+		t.Errorf("Source mapping should be constant type")
+	}
+	if result[2].Type != "sync_metadata" {
+		t.Errorf("SyncRunID mapping should be sync_metadata type")
+	}
+	if result[3].Type != "liquid_template" {
+		t.Errorf("FullName mapping should be liquid_template type")
+	}
+}
+
+func TestMatchFieldMappingsByTo_EmptyState(t *testing.T) {
+	// State is empty (new resource)
+	stateMappings := []interface{}{}
+
+	// API returns mappings
+	apiMappings := []client.FieldMapping{
+		{
+			From: "email",
+			To:   "Email",
+			Type: "direct",
+		},
+		{
+			From: "first_name",
+			To:   "FirstName",
+			Type: "direct",
+		},
+	}
+
+	result := provider.MatchFieldMappingsByTo(stateMappings, apiMappings)
+
+	// Should return all API mappings in their original order
+	if len(result) != 2 {
+		t.Errorf("Expected 2 mappings, got %d", len(result))
+	}
+	if !reflect.DeepEqual(result, apiMappings) {
+		t.Errorf("With empty state, should return API mappings unchanged")
+	}
+}
+
+func TestMatchFieldMappingsByTo_EmptyAPI(t *testing.T) {
+	// State has mappings
+	stateMappings := []interface{}{
+		map[string]interface{}{
+			"from": "email",
+			"to":   "Email",
+		},
+	}
+
+	// API returns no mappings
+	apiMappings := []client.FieldMapping{}
+
+	result := provider.MatchFieldMappingsByTo(stateMappings, apiMappings)
+
+	// Should return empty result
+	if len(result) != 0 {
+		t.Errorf("Expected 0 mappings, got %d", len(result))
+	}
+}
+
+func TestMatchFieldMappingsByTo_BothEmpty(t *testing.T) {
+	stateMappings := []interface{}{}
+	apiMappings := []client.FieldMapping{}
+
+	result := provider.MatchFieldMappingsByTo(stateMappings, apiMappings)
+
+	// Should return empty result
+	if len(result) != 0 {
+		t.Errorf("Expected 0 mappings, got %d", len(result))
+	}
+}
+
+// ============================================================================
 // Alert Tests
 // ============================================================================
 
