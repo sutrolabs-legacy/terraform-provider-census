@@ -107,6 +107,7 @@ type FieldMapping struct {
 type MappingAttributes struct {
 	From                MappingFrom `json:"from"`
 	To                  string      `json:"to"`
+	Position            int         `json:"position"` // Position of mapping in the sync (0-indexed, set by Census API)
 	IsPrimaryIdentifier bool        `json:"is_primary_identifier"`
 	LookupObject        string      `json:"lookup_object,omitempty"`
 	LookupField         string      `json:"lookup_field,omitempty"`

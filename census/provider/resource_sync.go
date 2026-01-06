@@ -1996,6 +1996,7 @@ func ConvertMappingAttributesToFieldMappings(mappings []client.MappingAttributes
 		result[i] = client.FieldMapping{
 			From:                from,
 			To:                  ma.To,
+			Position:            ma.Position,
 			Type:                mappingType,
 			Constant:            constant,
 			SyncMetadataKey:     syncMetadataKey,
