@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"reflect"
+	"sort"
 	"strconv"
 	"strings"
 
@@ -857,6 +858,16 @@ To fix this, add the missing workspace_id to terraform state:
 	} else {
 		fmt.Printf("[DEBUG] Using empty field mappings\n")
 		fieldMappings = []client.FieldMapping{} // Empty slice as fallback
+	}
+
+	// Sort API mappings by position (Census's canonical order)
+	// Position is always set by Census API regardless of field_order setting
+	// This prevents spurious diffs when the Census API returns mappings in a different order
+	if len(fieldMappings) > 0 {
+		fmt.Printf("[DEBUG] Sorting field mappings by position\n")
+		sort.Slice(fieldMappings, func(i, j int) bool {
+			return fieldMappings[i].Position < fieldMappings[j].Position
+		})
 	}
 
 	fmt.Printf("[DEBUG] Setting field_mapping\n")
@@ -1985,6 +1996,7 @@ func ConvertMappingAttributesToFieldMappings(mappings []client.MappingAttributes
 		result[i] = client.FieldMapping{
 			From:                from,
 			To:                  ma.To,
+			Position:            ma.Position,
 			Type:                mappingType,
 			Constant:            constant,
 			SyncMetadataKey:     syncMetadataKey,

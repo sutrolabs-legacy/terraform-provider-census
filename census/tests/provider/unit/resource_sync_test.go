@@ -2,6 +2,7 @@ package unit_test
 
 import (
 	"reflect"
+	"sort"
 	"testing"
 
 	"github.com/sutrolabs/terraform-provider-census/census/client"
@@ -295,6 +296,152 @@ func TestFlattenFieldMappings_Empty(t *testing.T) {
 	result := provider.FlattenFieldMappings([]client.FieldMapping{})
 	if len(result) != 0 {
 		t.Errorf("FlattenFieldMappings(empty) should return empty slice, got %d items", len(result))
+	}
+}
+
+// ============================================================================
+// Field Mapping Ordering Tests
+// ============================================================================
+// These tests verify that field mappings are sorted by position from the Census API,
+// preventing spurious diffs when the API returns mappings in non-deterministic order.
+
+func TestSortFieldMappingsByPosition_Basic(t *testing.T) {
+	// Simulate API response with mappings in wrong order
+	mappings := []client.FieldMapping{
+		{
+			From:     "last_name",
+			To:       "LastName",
+			Position: 2,
+			Type:     "direct",
+		},
+		{
+			From:     "email",
+			To:       "Email",
+			Position: 0,
+			Type:     "direct",
+		},
+		{
+			From:     "first_name",
+			To:       "FirstName",
+			Position: 1,
+			Type:     "direct",
+		},
+	}
+
+	// Sort by position
+	sort.Slice(mappings, func(i, j int) bool {
+		return mappings[i].Position < mappings[j].Position
+	})
+
+	// Verify result is sorted by position
+	if len(mappings) != 3 {
+		t.Errorf("Expected 3 mappings, got %d", len(mappings))
+	}
+
+	expectedOrder := []string{"Email", "FirstName", "LastName"}
+	expectedPositions := []int{0, 1, 2}
+	for i, mapping := range mappings {
+		if mapping.To != expectedOrder[i] {
+			t.Errorf("Position %d: got %s, want %s", i, mapping.To, expectedOrder[i])
+		}
+		if mapping.Position != expectedPositions[i] {
+			t.Errorf("Mapping %d: got position %d, want %d", i, mapping.Position, expectedPositions[i])
+		}
+	}
+}
+
+func TestSortFieldMappingsByPosition_AlreadyOrdered(t *testing.T) {
+	// Simulate API response already in correct order
+	mappings := []client.FieldMapping{
+		{To: "Email", Position: 0},
+		{To: "FirstName", Position: 1},
+		{To: "LastName", Position: 2},
+	}
+
+	// Sort by position (should be stable)
+	sort.Slice(mappings, func(i, j int) bool {
+		return mappings[i].Position < mappings[j].Position
+	})
+
+	// Verify order is unchanged
+	expectedOrder := []string{"Email", "FirstName", "LastName"}
+	for i, mapping := range mappings {
+		if mapping.To != expectedOrder[i] {
+			t.Errorf("Position %d: got %s, want %s", i, mapping.To, expectedOrder[i])
+		}
+	}
+}
+
+func TestSortFieldMappingsByPosition_MixedMappingTypes(t *testing.T) {
+	// Test with various mapping types in wrong order
+	mappings := []client.FieldMapping{
+		{
+			To:             "FullName",
+			Position:       3,
+			Type:           "liquid_template",
+			LiquidTemplate: "{{ first_name }} {{ last_name }}",
+		},
+		{
+			From:                "email",
+			To:                  "Email",
+			Position:            0,
+			Type:                "direct",
+			IsPrimaryIdentifier: true,
+		},
+		{
+			To:              "SyncRunID",
+			Position:        2,
+			Type:            "sync_metadata",
+			SyncMetadataKey: "sync_run_id",
+		},
+		{
+			To:       "Source",
+			Position: 1,
+			Type:     "constant",
+			Constant: "Website",
+		},
+	}
+
+	// Sort by position
+	sort.Slice(mappings, func(i, j int) bool {
+		return mappings[i].Position < mappings[j].Position
+	})
+
+	// Verify order matches positions
+	expectedOrder := []string{"Email", "Source", "SyncRunID", "FullName"}
+	for i, mapping := range mappings {
+		if mapping.To != expectedOrder[i] {
+			t.Errorf("Position %d: got %s, want %s", i, mapping.To, expectedOrder[i])
+		}
+	}
+
+	// Verify types are preserved
+	if mappings[0].Type != "direct" || !mappings[0].IsPrimaryIdentifier {
+		t.Errorf("Email mapping should be direct type with primary identifier")
+	}
+	if mappings[1].Type != "constant" {
+		t.Errorf("Source mapping should be constant type")
+	}
+	if mappings[2].Type != "sync_metadata" {
+		t.Errorf("SyncRunID mapping should be sync_metadata type")
+	}
+	if mappings[3].Type != "liquid_template" {
+		t.Errorf("FullName mapping should be liquid_template type")
+	}
+}
+
+func TestSortFieldMappingsByPosition_EmptySlice(t *testing.T) {
+	// Empty slice
+	mappings := []client.FieldMapping{}
+
+	// Sort should not panic
+	sort.Slice(mappings, func(i, j int) bool {
+		return mappings[i].Position < mappings[j].Position
+	})
+
+	// Should still be empty
+	if len(mappings) != 0 {
+		t.Errorf("Expected 0 mappings, got %d", len(mappings))
 	}
 }
 

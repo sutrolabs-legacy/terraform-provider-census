@@ -86,6 +86,7 @@ type AlertAttribute struct {
 type FieldMapping struct {
 	From                string      `json:"from"`
 	To                  string      `json:"to"`
+	Position            int         `json:"position"`                        // Position of mapping in the sync (0-indexed, set by Census API)
 	Type                string      `json:"operation,omitempty"`             // direct, hash, constant, sync_metadata, segment_membership, liquid_template - JSON is still "operation" for API compatibility
 	Constant            interface{} `json:"constant,omitempty"`              // For constant mappings
 	SyncMetadataKey     string      `json:"sync_metadata_key,omitempty"`     // For sync_metadata mappings (e.g., "sync_run_id")
@@ -106,6 +107,7 @@ type FieldMapping struct {
 type MappingAttributes struct {
 	From                MappingFrom `json:"from"`
 	To                  string      `json:"to"`
+	Position            int         `json:"position"` // Position of mapping in the sync (0-indexed, set by Census API)
 	IsPrimaryIdentifier bool        `json:"is_primary_identifier"`
 	LookupObject        string      `json:"lookup_object,omitempty"`
 	LookupField         string      `json:"lookup_field,omitempty"`

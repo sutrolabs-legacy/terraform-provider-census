@@ -5,18 +5,19 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased - v0.3.0]
-
-### Changed
-- **[PLANNED]** Migrate `field_mapping` from TypeList to TypeSet for true order independence. This will cause a one-time diff showing all mappings as "replaced" during upgrade, but eliminates all future order-related drift. The migration is automatic and safe - mappings are keyed by destination field ("to") which is unique per sync. Users will see a large but harmless diff on first upgrade.
-
-## [0.2.9] - 2025-01-02
+## [0.2.9] - Unreleased
 
 ### Fixed
 - **Alert Management**: Fixed alert lifecycle management to follow Terraform best practices. Previously, the provider would omit the `alert_attributes` field when no alerts were configured, causing the Census API to add default alerts on create and preserve existing alerts on update. The provider now always sends `alert_attributes` (as an empty array when no alerts are configured), ensuring:
   - Syncs created without alerts have no alerts (no default alerts added)
   - All alerts can be deleted from a sync by removing all `alert` blocks and applying
   - Terraform state matches user configuration with no unexpected drift
+- **Field Mapping Order Drift**: Fixed spurious diffs in `field_mapping` blocks caused by non-deterministic ordering from the Census API. The Census API now exposes a `position` field that represents the canonical order of mappings (set based on the order they appear in API requests). The provider sorts mappings by position before comparing to Terraform state, ensuring:
+  - Mappings are always returned in their canonical order
+  - Works correctly regardless of `field_order` setting ("mapping_order" or "alphabetical_column_name")
+  - Real changes to mapping order are properly detected
+  - No spurious diffs when nothing has changed
+  - Requires Census API v0.2.9+ for position field support
 
 ## [0.2.8] - 2025-12-30
 
