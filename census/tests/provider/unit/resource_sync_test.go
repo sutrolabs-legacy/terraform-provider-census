@@ -2,6 +2,7 @@ package unit_test
 
 import (
 	"reflect"
+	"sort"
 	"testing"
 
 	"github.com/sutrolabs/terraform-provider-census/census/client"
@@ -301,310 +302,146 @@ func TestFlattenFieldMappings_Empty(t *testing.T) {
 // ============================================================================
 // Field Mapping Ordering Tests
 // ============================================================================
-// These tests verify that field mappings are reordered to match Terraform state
-// order based on the "to" field, preventing spurious diffs when the Census API
-// returns mappings in a different order.
+// These tests verify that field mappings are sorted by position from the Census API,
+// preventing spurious diffs when the API returns mappings in non-deterministic order.
 
-func TestMatchFieldMappingsByTo_PreservesStateOrder(t *testing.T) {
-	// Simulate state with mappings in a specific order
-	stateMappings := []interface{}{
-		map[string]interface{}{
-			"from": "email",
-			"to":   "Email",
-			"type": "direct",
+func TestSortFieldMappingsByPosition_Basic(t *testing.T) {
+	// Simulate API response with mappings in wrong order
+	mappings := []client.FieldMapping{
+		{
+			From:     "last_name",
+			To:       "LastName",
+			Position: 2,
+			Type:     "direct",
 		},
-		map[string]interface{}{
-			"from": "first_name",
-			"to":   "FirstName",
-			"type": "direct",
+		{
+			From:     "email",
+			To:       "Email",
+			Position: 0,
+			Type:     "direct",
 		},
-		map[string]interface{}{
-			"from": "last_name",
-			"to":   "LastName",
-			"type": "direct",
+		{
+			From:     "first_name",
+			To:       "FirstName",
+			Position: 1,
+			Type:     "direct",
 		},
 	}
 
-	// Simulate API response in different order
-	apiMappings := []client.FieldMapping{
-		{
-			From: "last_name",
-			To:   "LastName",
-			Type: "direct",
-		},
-		{
-			From: "email",
-			To:   "Email",
-			Type: "direct",
-		},
-		{
-			From: "first_name",
-			To:   "FirstName",
-			Type: "direct",
-		},
-	}
+	// Sort by position
+	sort.Slice(mappings, func(i, j int) bool {
+		return mappings[i].Position < mappings[j].Position
+	})
 
-	result := provider.MatchFieldMappingsByTo(stateMappings, apiMappings)
-
-	// Verify result matches state order
-	if len(result) != 3 {
-		t.Errorf("Expected 3 mappings, got %d", len(result))
+	// Verify result is sorted by position
+	if len(mappings) != 3 {
+		t.Errorf("Expected 3 mappings, got %d", len(mappings))
 	}
 
 	expectedOrder := []string{"Email", "FirstName", "LastName"}
-	for i, mapping := range result {
+	expectedPositions := []int{0, 1, 2}
+	for i, mapping := range mappings {
 		if mapping.To != expectedOrder[i] {
-			t.Errorf("Result[%d].To = %s, want %s", i, mapping.To, expectedOrder[i])
+			t.Errorf("Position %d: got %s, want %s", i, mapping.To, expectedOrder[i])
+		}
+		if mapping.Position != expectedPositions[i] {
+			t.Errorf("Mapping %d: got position %d, want %d", i, mapping.Position, expectedPositions[i])
 		}
 	}
 }
 
-func TestMatchFieldMappingsByTo_HandlesNewMappings(t *testing.T) {
-	// State has 2 mappings
-	stateMappings := []interface{}{
-		map[string]interface{}{
-			"from": "email",
-			"to":   "Email",
-		},
-		map[string]interface{}{
-			"from": "first_name",
-			"to":   "FirstName",
-		},
+func TestSortFieldMappingsByPosition_AlreadyOrdered(t *testing.T) {
+	// Simulate API response already in correct order
+	mappings := []client.FieldMapping{
+		{To: "Email", Position: 0},
+		{To: "FirstName", Position: 1},
+		{To: "LastName", Position: 2},
 	}
 
-	// API returns 3 mappings (one new)
-	apiMappings := []client.FieldMapping{
-		{
-			From: "email",
-			To:   "Email",
-			Type: "direct",
-		},
-		{
-			From: "last_name",
-			To:   "LastName", // New mapping not in state
-			Type: "direct",
-		},
-		{
-			From: "first_name",
-			To:   "FirstName",
-			Type: "direct",
-		},
-	}
+	// Sort by position (should be stable)
+	sort.Slice(mappings, func(i, j int) bool {
+		return mappings[i].Position < mappings[j].Position
+	})
 
-	result := provider.MatchFieldMappingsByTo(stateMappings, apiMappings)
-
-	// Verify result has all 3 mappings
-	if len(result) != 3 {
-		t.Errorf("Expected 3 mappings, got %d", len(result))
-	}
-
-	// First 2 should match state order
-	if result[0].To != "Email" {
-		t.Errorf("Result[0].To = %s, want Email", result[0].To)
-	}
-	if result[1].To != "FirstName" {
-		t.Errorf("Result[1].To = %s, want FirstName", result[1].To)
-	}
-
-	// New mapping should be appended at the end
-	if result[2].To != "LastName" {
-		t.Errorf("Result[2].To = %s, want LastName (new mapping should be at end)", result[2].To)
-	}
-}
-
-func TestMatchFieldMappingsByTo_HandlesRemovedMappings(t *testing.T) {
-	// State has 3 mappings
-	stateMappings := []interface{}{
-		map[string]interface{}{
-			"from": "email",
-			"to":   "Email",
-		},
-		map[string]interface{}{
-			"from": "first_name",
-			"to":   "FirstName",
-		},
-		map[string]interface{}{
-			"from": "last_name",
-			"to":   "LastName",
-		},
-	}
-
-	// API returns only 2 mappings (one removed)
-	apiMappings := []client.FieldMapping{
-		{
-			From: "email",
-			To:   "Email",
-			Type: "direct",
-		},
-		{
-			From: "last_name",
-			To:   "LastName",
-			Type: "direct",
-		},
-	}
-
-	result := provider.MatchFieldMappingsByTo(stateMappings, apiMappings)
-
-	// Verify result has only 2 mappings
-	if len(result) != 2 {
-		t.Errorf("Expected 2 mappings, got %d", len(result))
-	}
-
-	// Should preserve state order for remaining mappings
-	if result[0].To != "Email" {
-		t.Errorf("Result[0].To = %s, want Email", result[0].To)
-	}
-	if result[1].To != "LastName" {
-		t.Errorf("Result[1].To = %s, want LastName", result[1].To)
-	}
-
-	// Verify FirstName was removed
-	for _, mapping := range result {
-		if mapping.To == "FirstName" {
-			t.Errorf("FirstName mapping should have been removed")
+	// Verify order is unchanged
+	expectedOrder := []string{"Email", "FirstName", "LastName"}
+	for i, mapping := range mappings {
+		if mapping.To != expectedOrder[i] {
+			t.Errorf("Position %d: got %s, want %s", i, mapping.To, expectedOrder[i])
 		}
 	}
 }
 
-func TestMatchFieldMappingsByTo_MixedMappingTypes(t *testing.T) {
-	// Test with various mapping types (direct, constant, liquid_template, etc.)
-	stateMappings := []interface{}{
-		map[string]interface{}{
-			"from":                  "email",
-			"to":                    "Email",
-			"type":                  "direct",
-			"is_primary_identifier": true,
-		},
-		map[string]interface{}{
-			"to":       "Source",
-			"type":     "constant",
-			"constant": "Website",
-		},
-		map[string]interface{}{
-			"to":              "SyncRunID",
-			"type":            "sync_metadata",
-			"sync_metadata_key": "sync_run_id",
-		},
-		map[string]interface{}{
-			"to":              "FullName",
-			"type":            "liquid_template",
-			"liquid_template": "{{ first_name }} {{ last_name }}",
-		},
-	}
-
-	// API returns in completely different order
-	apiMappings := []client.FieldMapping{
+func TestSortFieldMappingsByPosition_MixedMappingTypes(t *testing.T) {
+	// Test with various mapping types in wrong order
+	mappings := []client.FieldMapping{
 		{
 			To:             "FullName",
+			Position:       3,
 			Type:           "liquid_template",
 			LiquidTemplate: "{{ first_name }} {{ last_name }}",
 		},
 		{
 			From:                "email",
 			To:                  "Email",
+			Position:            0,
 			Type:                "direct",
 			IsPrimaryIdentifier: true,
 		},
 		{
 			To:              "SyncRunID",
+			Position:        2,
 			Type:            "sync_metadata",
 			SyncMetadataKey: "sync_run_id",
 		},
 		{
 			To:       "Source",
+			Position: 1,
 			Type:     "constant",
 			Constant: "Website",
 		},
 	}
 
-	result := provider.MatchFieldMappingsByTo(stateMappings, apiMappings)
+	// Sort by position
+	sort.Slice(mappings, func(i, j int) bool {
+		return mappings[i].Position < mappings[j].Position
+	})
 
-	// Verify result has all 4 mappings
-	if len(result) != 4 {
-		t.Errorf("Expected 4 mappings, got %d", len(result))
-	}
-
-	// Verify order matches state
+	// Verify order matches positions
 	expectedOrder := []string{"Email", "Source", "SyncRunID", "FullName"}
-	for i, mapping := range result {
+	for i, mapping := range mappings {
 		if mapping.To != expectedOrder[i] {
-			t.Errorf("Result[%d].To = %s, want %s", i, mapping.To, expectedOrder[i])
+			t.Errorf("Position %d: got %s, want %s", i, mapping.To, expectedOrder[i])
 		}
 	}
 
 	// Verify types are preserved
-	if result[0].Type != "direct" || !result[0].IsPrimaryIdentifier {
+	if mappings[0].Type != "direct" || !mappings[0].IsPrimaryIdentifier {
 		t.Errorf("Email mapping should be direct type with primary identifier")
 	}
-	if result[1].Type != "constant" {
+	if mappings[1].Type != "constant" {
 		t.Errorf("Source mapping should be constant type")
 	}
-	if result[2].Type != "sync_metadata" {
+	if mappings[2].Type != "sync_metadata" {
 		t.Errorf("SyncRunID mapping should be sync_metadata type")
 	}
-	if result[3].Type != "liquid_template" {
+	if mappings[3].Type != "liquid_template" {
 		t.Errorf("FullName mapping should be liquid_template type")
 	}
 }
 
-func TestMatchFieldMappingsByTo_EmptyState(t *testing.T) {
-	// State is empty (new resource)
-	stateMappings := []interface{}{}
+func TestSortFieldMappingsByPosition_EmptySlice(t *testing.T) {
+	// Empty slice
+	mappings := []client.FieldMapping{}
 
-	// API returns mappings
-	apiMappings := []client.FieldMapping{
-		{
-			From: "email",
-			To:   "Email",
-			Type: "direct",
-		},
-		{
-			From: "first_name",
-			To:   "FirstName",
-			Type: "direct",
-		},
-	}
+	// Sort should not panic
+	sort.Slice(mappings, func(i, j int) bool {
+		return mappings[i].Position < mappings[j].Position
+	})
 
-	result := provider.MatchFieldMappingsByTo(stateMappings, apiMappings)
-
-	// Should return all API mappings in their original order
-	if len(result) != 2 {
-		t.Errorf("Expected 2 mappings, got %d", len(result))
-	}
-	if !reflect.DeepEqual(result, apiMappings) {
-		t.Errorf("With empty state, should return API mappings unchanged")
-	}
-}
-
-func TestMatchFieldMappingsByTo_EmptyAPI(t *testing.T) {
-	// State has mappings
-	stateMappings := []interface{}{
-		map[string]interface{}{
-			"from": "email",
-			"to":   "Email",
-		},
-	}
-
-	// API returns no mappings
-	apiMappings := []client.FieldMapping{}
-
-	result := provider.MatchFieldMappingsByTo(stateMappings, apiMappings)
-
-	// Should return empty result
-	if len(result) != 0 {
-		t.Errorf("Expected 0 mappings, got %d", len(result))
-	}
-}
-
-func TestMatchFieldMappingsByTo_BothEmpty(t *testing.T) {
-	stateMappings := []interface{}{}
-	apiMappings := []client.FieldMapping{}
-
-	result := provider.MatchFieldMappingsByTo(stateMappings, apiMappings)
-
-	// Should return empty result
-	if len(result) != 0 {
-		t.Errorf("Expected 0 mappings, got %d", len(result))
+	// Should still be empty
+	if len(mappings) != 0 {
+		t.Errorf("Expected 0 mappings, got %d", len(mappings))
 	}
 }
 

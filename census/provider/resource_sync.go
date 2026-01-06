@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"reflect"
+	"sort"
 	"strconv"
 	"strings"
 
@@ -859,12 +860,14 @@ To fix this, add the missing workspace_id to terraform state:
 		fieldMappings = []client.FieldMapping{} // Empty slice as fallback
 	}
 
-	// Reorder API mappings to match state order by "to" field
+	// Sort API mappings by position (Census's canonical order)
+	// Position is always set by Census API regardless of field_order setting
 	// This prevents spurious diffs when the Census API returns mappings in a different order
-	stateMappings := d.Get("field_mapping").([]interface{})
-	if len(stateMappings) > 0 && len(fieldMappings) > 0 {
-		fmt.Printf("[DEBUG] Reordering field mappings to match state order\n")
-		fieldMappings = MatchFieldMappingsByTo(stateMappings, fieldMappings)
+	if len(fieldMappings) > 0 {
+		fmt.Printf("[DEBUG] Sorting field mappings by position\n")
+		sort.Slice(fieldMappings, func(i, j int) bool {
+			return fieldMappings[i].Position < fieldMappings[j].Position
+		})
 	}
 
 	fmt.Printf("[DEBUG] Setting field_mapping\n")
@@ -1244,58 +1247,6 @@ func FlattenFieldMappings(mappings []client.FieldMapping) []interface{} {
 
 		result[i] = mappingMap
 	}
-	return result
-}
-
-// MatchFieldMappingsByTo reorders API field mappings to match the order in Terraform state
-// based on the "to" field, which is unique. This prevents spurious diffs when the Census API
-// returns field mappings in a different order than they appear in the config.
-func MatchFieldMappingsByTo(stateMappings []interface{}, apiMappings []client.FieldMapping) []client.FieldMapping {
-	fmt.Printf("[DEBUG] matchFieldMappingsByTo: state count=%d, api count=%d\n", len(stateMappings), len(apiMappings))
-
-	// Build map: "to" value -> API mapping
-	apiMap := make(map[string]client.FieldMapping)
-	for _, m := range apiMappings {
-		apiMap[m.To] = m
-		fmt.Printf("[DEBUG] matchFieldMappingsByTo: API mapping to=%s\n", m.To)
-	}
-
-	// Reconstruct in state order
-	result := make([]client.FieldMapping, 0, len(apiMappings))
-	seen := make(map[string]bool)
-
-	// First, add mappings in state order
-	for _, sm := range stateMappings {
-		stateMapping, ok := sm.(map[string]interface{})
-		if !ok {
-			fmt.Printf("[DEBUG] matchFieldMappingsByTo: skipping non-map state mapping: %T\n", sm)
-			continue
-		}
-
-		toField, ok := stateMapping["to"].(string)
-		if !ok {
-			fmt.Printf("[DEBUG] matchFieldMappingsByTo: skipping state mapping with non-string 'to': %T\n", stateMapping["to"])
-			continue
-		}
-
-		if apiMapping, exists := apiMap[toField]; exists {
-			fmt.Printf("[DEBUG] matchFieldMappingsByTo: matched state to=%s\n", toField)
-			result = append(result, apiMapping)
-			seen[toField] = true
-		} else {
-			fmt.Printf("[DEBUG] matchFieldMappingsByTo: state mapping to=%s not found in API response (removed)\n", toField)
-		}
-	}
-
-	// Then append any new mappings from API that weren't in state
-	for _, m := range apiMappings {
-		if !seen[m.To] {
-			fmt.Printf("[DEBUG] matchFieldMappingsByTo: appending new API mapping to=%s\n", m.To)
-			result = append(result, m)
-		}
-	}
-
-	fmt.Printf("[DEBUG] matchFieldMappingsByTo: result count=%d\n", len(result))
 	return result
 }
 
