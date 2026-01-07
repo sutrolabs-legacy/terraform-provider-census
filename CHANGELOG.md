@@ -8,6 +8,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [0.2.9] - 2025-01-06
 
 ### Fixed
+- **Field Mapping Drift with sync_all_properties**: Fixed unwanted Terraform plan diffs for field mappings when using `field_behavior = "sync_all_properties"`. Previously, Census-managed auto-generated mappings would show as drift on every plan, requiring users to add `lifecycle { ignore_changes = [field_mapping] }` as a workaround. Now the provider uses `CustomizeDiff` to intelligently merge user-configured mappings with Census-managed mappings, suppressing diffs for auto-generated fields while still showing changes for explicitly configured mappings.
+
 - **Alert Management**: Fixed alert lifecycle management to follow Terraform best practices. Previously, the provider would omit the `alert_attributes` field when no alerts were configured, causing the Census API to add default alerts on create and preserve existing alerts on update. The provider now always sends `alert_attributes` (as an empty array when no alerts are configured), ensuring:
   - Syncs created without alerts have no alerts (no default alerts added)
   - All alerts can be deleted from a sync by removing all `alert` blocks and applying
@@ -34,6 +36,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Only retrying 429 errors (other errors like 5xx, network failures are not retried and fail immediately)
   - Providing debug and warning logs for retry attempts via Terraform's structured logging
   - Gracefully handling context cancellation and deadline exhaustion
+
 ### Removed
 - **BREAKING**: Removed `type = "hash"` as a valid field mapping type. This option was never implemented in the Census API and had no functional effect (it was treated identically to `type = "direct"`). Any configurations using `type = "hash"` should be changed to `type = "direct"` or simply omit the type field (direct is the default).
 

@@ -1560,3 +1560,237 @@ func TestConvertMappingAttributesToFieldMappings_RoundTrip(t *testing.T) {
 func boolPtr(b bool) *bool {
 	return &b
 }
+
+// ============================================================================
+// MergeFieldMappingsForSyncAll Tests (CustomizeDiff helper)
+// ============================================================================
+
+func TestMergeFieldMappingsForSyncAll_PreservesStateOrder(t *testing.T) {
+	// State has: id, email, first_name (Census auto-generated)
+	// Config has: id (user-configured)
+	// Result should preserve state order, no changes
+	stateMappings := []interface{}{
+		map[string]interface{}{"from": "id", "to": "id", "is_primary_identifier": true},
+		map[string]interface{}{"from": "email", "to": "email"},
+		map[string]interface{}{"from": "first_name", "to": "first_name"},
+	}
+	configMappings := []interface{}{
+		map[string]interface{}{"from": "id", "to": "id", "is_primary_identifier": true},
+	}
+
+	result := provider.MergeFieldMappingsForSyncAll(stateMappings, configMappings)
+
+	if len(result) != 3 {
+		t.Errorf("Expected 3 mappings, got %d", len(result))
+	}
+
+	// Verify order is preserved
+	expectedTos := []string{"id", "email", "first_name"}
+	for i, mapping := range result {
+		m := mapping.(map[string]interface{})
+		if m["to"] != expectedTos[i] {
+			t.Errorf("Position %d: expected 'to'=%s, got %s", i, expectedTos[i], m["to"])
+		}
+	}
+}
+
+func TestMergeFieldMappingsForSyncAll_UserAddsNewMapping(t *testing.T) {
+	// State has: id, email (from Census)
+	// Config has: id, beep_beep (user adds new constant mapping)
+	// Result should have: id, email, beep_beep (new mapping at end)
+	stateMappings := []interface{}{
+		map[string]interface{}{"from": "id", "to": "id", "is_primary_identifier": true},
+		map[string]interface{}{"from": "email", "to": "email"},
+	}
+	configMappings := []interface{}{
+		map[string]interface{}{"from": "id", "to": "id", "is_primary_identifier": true},
+		map[string]interface{}{"type": "constant", "constant": "coolbeans", "to": "beep_beep"},
+	}
+
+	result := provider.MergeFieldMappingsForSyncAll(stateMappings, configMappings)
+
+	if len(result) != 3 {
+		t.Errorf("Expected 3 mappings, got %d", len(result))
+	}
+
+	// New mapping should be at end
+	lastMapping := result[2].(map[string]interface{})
+	if lastMapping["to"] != "beep_beep" {
+		t.Errorf("Expected new mapping 'beep_beep' at end, got %s", lastMapping["to"])
+	}
+	if lastMapping["constant"] != "coolbeans" {
+		t.Errorf("Expected constant 'coolbeans', got %v", lastMapping["constant"])
+	}
+}
+
+func TestMergeFieldMappingsForSyncAll_UserModifiesMapping(t *testing.T) {
+	// State has: id (with from=id)
+	// Config has: id (with from=user_id - user changed it)
+	// Result should use user's version
+	stateMappings := []interface{}{
+		map[string]interface{}{"from": "id", "to": "id", "is_primary_identifier": true},
+	}
+	configMappings := []interface{}{
+		map[string]interface{}{"from": "user_id", "to": "id", "is_primary_identifier": true},
+	}
+
+	result := provider.MergeFieldMappingsForSyncAll(stateMappings, configMappings)
+
+	if len(result) != 1 {
+		t.Errorf("Expected 1 mapping, got %d", len(result))
+	}
+
+	mapping := result[0].(map[string]interface{})
+	if mapping["from"] != "user_id" {
+		t.Errorf("Expected user's 'from'=user_id, got %s", mapping["from"])
+	}
+}
+
+func TestMergeFieldMappingsForSyncAll_EmptyState(t *testing.T) {
+	// State is empty (new resource)
+	// Config has mappings
+	// Result should just be config mappings
+	stateMappings := []interface{}{}
+	configMappings := []interface{}{
+		map[string]interface{}{"from": "id", "to": "id", "is_primary_identifier": true},
+	}
+
+	result := provider.MergeFieldMappingsForSyncAll(stateMappings, configMappings)
+
+	if len(result) != 1 {
+		t.Errorf("Expected 1 mapping, got %d", len(result))
+	}
+}
+
+func TestMergeFieldMappingsForSyncAll_EmptyConfig(t *testing.T) {
+	// State has Census mappings
+	// Config is empty (user doesn't specify any)
+	// Result should preserve all state mappings
+	stateMappings := []interface{}{
+		map[string]interface{}{"from": "id", "to": "id"},
+		map[string]interface{}{"from": "email", "to": "email"},
+	}
+	configMappings := []interface{}{}
+
+	result := provider.MergeFieldMappingsForSyncAll(stateMappings, configMappings)
+
+	if len(result) != 2 {
+		t.Errorf("Expected 2 mappings, got %d", len(result))
+	}
+}
+
+func TestMergeFieldMappingsForSyncAll_RemovesUserConfiguredMappings(t *testing.T) {
+	// State has: trivial mapping (Census) + constant mapping (user)
+	// Config removes the constant mapping
+	// Result should drop the constant mapping but keep the trivial one
+	stateMappings := []interface{}{
+		map[string]interface{}{"from": "id", "to": "id", "is_primary_identifier": true},
+		map[string]interface{}{"from": "email", "to": "email"},             // Census-managed (trivial)
+		map[string]interface{}{"constant": "coolbeans", "to": "beep_beep"}, // User-configured
+	}
+	// User removes the constant mapping and also removes the primary ID (keeping only trivial in config)
+	configMappings := []interface{}{
+		map[string]interface{}{"from": "id", "to": "id", "is_primary_identifier": true},
+	}
+
+	result := provider.MergeFieldMappingsForSyncAll(stateMappings, configMappings)
+
+	// Should have: primary ID (from config) + email (Census-managed, preserved)
+	// Should NOT have: constant mapping (user-configured, removed from config)
+	if len(result) != 2 {
+		t.Errorf("Expected 2 mappings, got %d", len(result))
+	}
+
+	// Verify constant mapping was dropped
+	for _, m := range result {
+		mapping := m.(map[string]interface{})
+		if to, _ := mapping["to"].(string); to == "beep_beep" {
+			t.Error("Expected constant mapping to beep_beep to be removed, but it was preserved")
+		}
+	}
+}
+
+// ============================================================================
+// IsCensusManagedMapping Tests
+// ============================================================================
+
+func TestIsCensusManagedMapping_TrivialMappings(t *testing.T) {
+	// These should all return true (Census-managed)
+	trivialMappings := []map[string]interface{}{
+		{"from": "email", "to": "email"},
+		{"from": "name", "to": "name", "operation": "set"},
+		{"from": "id", "to": "id", "operation": ""},
+	}
+
+	for i, m := range trivialMappings {
+		if !provider.IsCensusManagedMapping(m) {
+			t.Errorf("Case %d: Expected trivial mapping to be Census-managed: %v", i, m)
+		}
+	}
+}
+
+func TestIsCensusManagedMapping_PrimaryIdentifier(t *testing.T) {
+	m := map[string]interface{}{
+		"from":                  "id",
+		"to":                    "id",
+		"is_primary_identifier": true,
+	}
+	if provider.IsCensusManagedMapping(m) {
+		t.Error("Primary identifier mapping should NOT be Census-managed")
+	}
+}
+
+func TestIsCensusManagedMapping_PrimaryIdentifierDirect(t *testing.T) {
+	m := map[string]interface{}{
+		"from":                  "id",
+		"to":                    "id",
+		"is_primary_identifier": true,
+		"type":                  "direct",
+	}
+	if provider.IsCensusManagedMapping(m) {
+		t.Error("Primary identifier with direct type should NOT be Census-managed")
+	}
+}
+
+func TestIsCensusManagedMapping_ConstantMapping(t *testing.T) {
+	m := map[string]interface{}{
+		"constant": "some_value",
+		"to":       "destination_field",
+	}
+	if provider.IsCensusManagedMapping(m) {
+		t.Error("Constant mapping should NOT be Census-managed")
+	}
+}
+
+func TestIsCensusManagedMapping_LiquidTemplate(t *testing.T) {
+	m := map[string]interface{}{
+		"liquid_template": "{{ row.first_name }} {{ row.last_name }}",
+		"to":              "full_name",
+	}
+	if provider.IsCensusManagedMapping(m) {
+		t.Error("Liquid template mapping should NOT be Census-managed")
+	}
+}
+
+func TestIsCensusManagedMapping_NonDefaultOperation(t *testing.T) {
+	m := map[string]interface{}{
+		"from":      "email",
+		"to":        "email_hash",
+		"operation": "hash",
+	}
+	if provider.IsCensusManagedMapping(m) {
+		t.Error("Non-default operation mapping should NOT be Census-managed")
+	}
+}
+
+func TestIsCensusManagedMapping_RenameIsCensusManaged(t *testing.T) {
+	// Rename mappings (from != to) ARE Census-managed because field_normalization
+	// can auto-generate them (e.g., "beepBoop" -> "beep_boop" with snake_case)
+	m := map[string]interface{}{
+		"from": "source_field",
+		"to":   "destination_field",
+	}
+	if !provider.IsCensusManagedMapping(m) {
+		t.Error("Rename mapping (from != to) SHOULD be Census-managed (field normalization)")
+	}
+}
