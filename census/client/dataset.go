@@ -166,14 +166,13 @@ func (c *Client) ListDatasetsWithToken(ctx context.Context, workspaceToken strin
 	return result.Data, nil
 }
 
-
 type RefreshColumnsResponse struct {
 	RefreshKey int `json:"refresh_key"`
 }
 
 type RefreshColumnsStatusResponse struct {
-	Status  string  `json:"status"`           
-	Message *string `json:"message,omitempty"` 
+	Status  string  `json:"status"`
+	Message *string `json:"message,omitempty"`
 }
 
 func (c *Client) RefreshDatasetColumns(ctx context.Context, datasetID int) (int, error) {
@@ -199,7 +198,6 @@ func (c *Client) GetDatasetRefreshStatus(ctx context.Context, datasetID int, ref
 	return c.GetDatasetRefreshStatusWithToken(ctx, datasetID, refreshKey, "")
 }
 
-
 func (c *Client) GetDatasetRefreshStatusWithToken(ctx context.Context, datasetID int, refreshKey int, workspaceToken string) (*RefreshColumnsStatusResponse, error) {
 	path := fmt.Sprintf("/datasets/%d/refresh_columns_status?refresh_key=%d", datasetID, refreshKey)
 	resp, err := c.makeRequestWithToken(ctx, http.MethodGet, path, nil, TokenTypeWorkspace, workspaceToken)
@@ -214,4 +212,3 @@ func (c *Client) GetDatasetRefreshStatusWithToken(ctx context.Context, datasetID
 
 	return &result, nil
 }
-
