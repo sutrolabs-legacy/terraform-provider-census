@@ -165,3 +165,53 @@ func (c *Client) ListDatasetsWithToken(ctx context.Context, workspaceToken strin
 
 	return result.Data, nil
 }
+
+
+type RefreshColumnsResponse struct {
+	RefreshKey int `json:"refresh_key"`
+}
+
+type RefreshColumnsStatusResponse struct {
+	Status  string  `json:"status"`           
+	Message *string `json:"message,omitempty"` 
+}
+
+func (c *Client) RefreshDatasetColumns(ctx context.Context, datasetID int) (int, error) {
+	return c.RefreshDatasetColumnsWithToken(ctx, datasetID, "")
+}
+
+func (c *Client) RefreshDatasetColumnsWithToken(ctx context.Context, datasetID int, workspaceToken string) (int, error) {
+	path := fmt.Sprintf("/datasets/%d/refresh_columns", datasetID)
+	resp, err := c.makeRequestWithToken(ctx, http.MethodPost, path, nil, TokenTypeWorkspace, workspaceToken)
+	if err != nil {
+		return 0, fmt.Errorf("failed to make refresh columns request: %w", err)
+	}
+
+	var result RefreshColumnsResponse
+	if err := c.handleResponse(resp, &result); err != nil {
+		return 0, fmt.Errorf("failed to refresh columns: %w", err)
+	}
+
+	return result.RefreshKey, nil
+}
+
+func (c *Client) GetDatasetRefreshStatus(ctx context.Context, datasetID int, refreshKey int) (*RefreshColumnsStatusResponse, error) {
+	return c.GetDatasetRefreshStatusWithToken(ctx, datasetID, refreshKey, "")
+}
+
+
+func (c *Client) GetDatasetRefreshStatusWithToken(ctx context.Context, datasetID int, refreshKey int, workspaceToken string) (*RefreshColumnsStatusResponse, error) {
+	path := fmt.Sprintf("/datasets/%d/refresh_columns_status?refresh_key=%d", datasetID, refreshKey)
+	resp, err := c.makeRequestWithToken(ctx, http.MethodGet, path, nil, TokenTypeWorkspace, workspaceToken)
+	if err != nil {
+		return nil, fmt.Errorf("failed to make get refresh status request: %w", err)
+	}
+
+	var result RefreshColumnsStatusResponse
+	if err := c.handleResponse(resp, &result); err != nil {
+		return nil, fmt.Errorf("failed to get refresh status: %w", err)
+	}
+
+	return &result, nil
+}
+
