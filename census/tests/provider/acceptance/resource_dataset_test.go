@@ -334,6 +334,9 @@ func TestAccResourceDataset_Import(t *testing.T) {
 				ImportState:       true,
 				ImportStateVerify: true,
 				ImportStateIdFunc: testAccDatasetImportStateIdFunc("census_dataset.test"),
+				ImportStateVerifyIgnore: []string{
+					"wait_for_metadata_refresh", // Optional field with default, not persisted in state after creation
+				},
 			},
 		},
 	})
