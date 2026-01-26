@@ -179,7 +179,7 @@ func resourceDatasetCreate(ctx context.Context, d *schema.ResourceData, meta int
 							"Creating syncs from this dataset might timeout until metadata is explicitly fetched.\n\n"+
 							"To resolve:\n"+
 							"1. Run 'terraform apply' again to retry metadata refresh\n"+
-							"2. Or remove 'wait_for_metadata_refresh = true' and manually trigger metadata refresh in the Census UI or API\n"
+							"2. Or remove 'wait_for_metadata_refresh = true' and manually trigger metadata refresh in the Census UI or API\n",
 						dataset.ID, err, dataset.ID),
 				},
 			}
