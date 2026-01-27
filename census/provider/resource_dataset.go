@@ -111,7 +111,7 @@ func resourceDataset() *schema.Resource {
 				Type:        schema.TypeBool,
 				Optional:    true,
 				Default:     false,
-				Description: "Wait for metadata refresh to complete before returning. Set to true when creating syncs immediately after dataset creation to avoid timeout issues. Defaults to false.",
+				Description: "Wait for metadata refresh to complete before returning. Only applicable during create. Set to true when creating syncs immediately after dataset creation to avoid timeout issues. Defaults to false.",
 			},
 			"metadata_ready": {
 				Type:        schema.TypeBool,
