@@ -116,7 +116,7 @@ func resourceDataset() *schema.Resource {
 			"metadata_ready": {
 				Type:        schema.TypeBool,
 				Computed:    true,
-				Description: "Indicates whether the dataset metadata (columns) has been refreshed and is ready for use in syncs.",
+				Description: "Indicates whether the dataset metadata (columns) has been refreshed.",
 			},
 		},
 	}
