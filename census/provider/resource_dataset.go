@@ -351,26 +351,95 @@ func resourceDatasetUpdate(ctx context.Context, d *schema.ResourceData, meta int
 	}
 
 	req := &client.UpdateDatasetRequest{}
+	hasDatasetChanges := false
 
 	// Only include changed fields
 	if d.HasChange("name") {
 		name := d.Get("name").(string)
 		req.Name = &name
+		hasDatasetChanges = true
 	}
 
 	if d.HasChange("description") {
 		desc := d.Get("description").(string)
 		req.Description = &desc
+		hasDatasetChanges = true
 	}
 
 	if d.HasChange("query") {
 		query := d.Get("query").(string)
 		req.Query = &query
+		hasDatasetChanges = true
 	}
 
-	_, err = apiClient.UpdateDatasetWithToken(ctx, id, req, workspaceToken)
-	if err != nil {
-		return diag.FromErr(err)
+	if hasDatasetChanges {
+		_, err = apiClient.UpdateDatasetWithToken(ctx, id, req, workspaceToken)
+		if err != nil {
+			return diag.FromErr(err)
+		}
+	}
+
+	// if wait_for_metadata_refresh changed from false to true and metadata isn't ready,
+	// trigger the metadata refresh flow
+	if d.HasChange("wait_for_metadata_refresh") {
+		old, new := d.GetChange("wait_for_metadata_refresh")
+		if !old.(bool) && new.(bool) && !d.Get("metadata_ready").(bool) {
+			refreshKey, err := apiClient.RefreshDatasetColumnsWithToken(ctx, id, workspaceToken)
+			if err != nil {
+				return diag.Diagnostics{
+					diag.Diagnostic{
+						Severity: diag.Error,
+						Summary:  "Failed to trigger metadata refresh",
+						Detail: fmt.Sprintf(
+							"Dataset %d exists, but metadata refresh could not be triggered: %v\n\n"+
+								"To resolve:\n"+
+								"1. Run 'terraform apply' again to retry metadata refresh\n"+
+								"2. Or remove 'wait_for_metadata_refresh = true' and manually trigger metadata refresh in the Census UI or API\n",
+							id, err),
+					},
+				}
+			}
+
+			createStateConf := &retry.StateChangeConf{
+				Pending: []string{"processing"},
+				Target:  []string{"completed"},
+				Refresh: func() (interface{}, string, error) {
+					statusResp, err := apiClient.GetDatasetRefreshStatusWithToken(ctx, id, refreshKey, workspaceToken)
+					if err != nil {
+						return nil, "", fmt.Errorf("metadata refresh failed: %w", err)
+					}
+
+					if statusResp.Status == "error" {
+						errMsg := "unknown error"
+						if statusResp.Message != nil {
+							errMsg = *statusResp.Message
+						}
+						return nil, "", fmt.Errorf("metadata refresh failed: %s", errMsg)
+					}
+
+					return statusResp, statusResp.Status, nil
+				},
+				Timeout:    30 * time.Minute,
+				Delay:      5 * time.Second,
+				MinTimeout: 3 * time.Second,
+			}
+
+			_, err = createStateConf.WaitForStateContext(ctx)
+			if err != nil {
+				return diag.Diagnostics{
+					diag.Diagnostic{
+						Severity: diag.Error,
+						Summary:  "Metadata refresh did not complete in time",
+						Detail: fmt.Sprintf(
+							"Dataset %d metadata refresh did not complete: %v\n\n"+
+								"To resolve:\n"+
+								"1. Run 'terraform apply' again to wait for metadata refresh to complete\n"+
+								"2. Check metadata refresh status in the Census UI\n",
+							id, err),
+					},
+				}
+			}
+		}
 	}
 
 	return resourceDatasetRead(ctx, d, meta)
