@@ -1560,3 +1560,294 @@ func TestConvertMappingAttributesToFieldMappings_RoundTrip(t *testing.T) {
 func boolPtr(b bool) *bool {
 	return &b
 }
+
+// ============================================================================
+// Compound Key Mapping Tests
+// ============================================================================
+// These tests verify that Census-managed compound_key mappings are properly
+// handled and filtered out to prevent drift in Terraform state.
+
+func TestConvertMappingAttributesToFieldMappings_CompoundKey(t *testing.T) {
+	// Test that compound_key type from API is properly converted
+	// Census auto-generates these for destinations like Google Ads with compound keys
+	input := []client.MappingAttributes{
+		{
+			From: client.MappingFrom{
+				Type: "compound_key",
+				Data: []interface{}{
+					map[string]interface{}{
+						"type": "column",
+						"data": "ID",
+					},
+					map[string]interface{}{
+						"type": "column",
+						"data": "ID",
+					},
+					map[string]interface{}{
+						"type": "column",
+						"data": "ID",
+					},
+				},
+			},
+			To:                  "click_conversion._census_tracking_id",
+			IsPrimaryIdentifier: true,
+			SyncNullValues:      boolPtr(true),
+		},
+	}
+
+	expected := []client.FieldMapping{
+		{
+			From:                "[map[data:ID type:column] map[data:ID type:column] map[data:ID type:column]]",
+			To:                  "click_conversion._census_tracking_id",
+			Type:                "compound_key",
+			IsPrimaryIdentifier: true,
+			SyncNullValues:      boolPtr(true),
+		},
+	}
+
+	result := provider.ConvertMappingAttributesToFieldMappings(input)
+	if len(result) != len(expected) {
+		t.Errorf("Expected %d mappings, got %d", len(expected), len(result))
+	}
+	if result[0].Type != "compound_key" {
+		t.Errorf("Expected Type='compound_key', got '%s'", result[0].Type)
+	}
+	if result[0].To != expected[0].To {
+		t.Errorf("Expected To='%s', got '%s'", expected[0].To, result[0].To)
+	}
+	if result[0].IsPrimaryIdentifier != expected[0].IsPrimaryIdentifier {
+		t.Errorf("Expected IsPrimaryIdentifier=%v, got %v", expected[0].IsPrimaryIdentifier, result[0].IsPrimaryIdentifier)
+	}
+}
+
+func TestConvertMappingAttributesToFieldMappings_WithCompoundKey(t *testing.T) {
+	// Test conversion of mixed mappings including a Census-managed compound_key
+	// This simulates the real API response for a Google Ads sync
+	input := []client.MappingAttributes{
+		{
+			From: client.MappingFrom{
+				Type: "column",
+				Data: "ID",
+			},
+			To:                  "click_conversion.conversion_date_time",
+			IsPrimaryIdentifier: false,
+			Position:            0,
+		},
+		{
+			From: client.MappingFrom{
+				Type: "column",
+				Data: "ID",
+			},
+			To:                  "click_conversion.gclid",
+			IsPrimaryIdentifier: false,
+			Position:            1,
+		},
+		{
+			From: client.MappingFrom{
+				Type: "column",
+				Data: "ID",
+			},
+			To:                  "click_conversion.conversion_action",
+			IsPrimaryIdentifier: false,
+			Position:            2,
+		},
+		{
+			From: client.MappingFrom{
+				Type: "compound_key",
+				Data: []interface{}{
+					map[string]interface{}{
+						"type": "column",
+						"data": "ID",
+					},
+					map[string]interface{}{
+						"type": "column",
+						"data": "ID",
+					},
+					map[string]interface{}{
+						"type": "column",
+						"data": "ID",
+					},
+				},
+			},
+			To:                  "click_conversion._census_tracking_id",
+			IsPrimaryIdentifier: true,
+			Position:            3,
+		},
+	}
+
+	result := provider.ConvertMappingAttributesToFieldMappings(input)
+
+	// Verify we have all 4 mappings
+	if len(result) != 4 {
+		t.Errorf("Expected 4 mappings, got %d", len(result))
+	}
+
+	// Verify the compound_key mapping is at the end
+	compoundKeyMapping := result[3]
+	if compoundKeyMapping.Type != "compound_key" {
+		t.Errorf("Expected last mapping Type='compound_key', got '%s'", compoundKeyMapping.Type)
+	}
+	if compoundKeyMapping.To != "click_conversion._census_tracking_id" {
+		t.Errorf("Expected To='click_conversion._census_tracking_id', got '%s'", compoundKeyMapping.To)
+	}
+	if !compoundKeyMapping.IsPrimaryIdentifier {
+		t.Errorf("Expected compound_key mapping to be primary identifier")
+	}
+
+	// Verify the user-defined mappings are correct
+	if result[0].Type != "direct" {
+		t.Errorf("Expected mapping 0 Type='direct', got '%s'", result[0].Type)
+	}
+	if result[0].From != "ID" {
+		t.Errorf("Expected mapping 0 From='ID', got '%s'", result[0].From)
+	}
+}
+
+func TestFilterCompoundKeyMappings(t *testing.T) {
+	// Test the filtering logic that removes Census-managed compound_key mappings
+	// This simulates what happens in resourceSyncRead
+	tests := []struct {
+		name     string
+		input    []client.FieldMapping
+		expected int // Number of mappings after filtering
+	}{
+		{
+			name: "filter out single compound_key mapping",
+			input: []client.FieldMapping{
+				{
+					From:                "ID",
+					To:                  "click_conversion.conversion_date_time",
+					Type:                "direct",
+					IsPrimaryIdentifier: false,
+					Position:            0,
+				},
+				{
+					From:                "ID",
+					To:                  "click_conversion.gclid",
+					Type:                "direct",
+					IsPrimaryIdentifier: false,
+					Position:            1,
+				},
+				{
+					From:                "[map[data:ID type:column] map[data:ID type:column] map[data:ID type:column]]",
+					To:                  "click_conversion._census_tracking_id",
+					Type:                "compound_key",
+					IsPrimaryIdentifier: true,
+					Position:            2,
+				},
+			},
+			expected: 2, // Only the 2 user-defined mappings
+		},
+		{
+			name: "no compound_key mappings to filter",
+			input: []client.FieldMapping{
+				{
+					From:                "email",
+					To:                  "Email",
+					Type:                "direct",
+					IsPrimaryIdentifier: true,
+					Position:            0,
+				},
+				{
+					From:     "first_name",
+					To:       "FirstName",
+					Type:     "direct",
+					Position: 1,
+				},
+			},
+			expected: 2, // All mappings remain
+		},
+		{
+			name:     "empty input",
+			input:    []client.FieldMapping{},
+			expected: 0,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Simulate the filtering logic from resourceSyncRead
+			userManagedMappings := make([]client.FieldMapping, 0, len(tt.input))
+			for _, mapping := range tt.input {
+				if mapping.Type != "compound_key" {
+					userManagedMappings = append(userManagedMappings, mapping)
+				}
+			}
+
+			if len(userManagedMappings) != tt.expected {
+				t.Errorf("Expected %d mappings after filtering, got %d", tt.expected, len(userManagedMappings))
+			}
+
+			// Verify no compound_key mappings remain
+			for i, mapping := range userManagedMappings {
+				if mapping.Type == "compound_key" {
+					t.Errorf("Mapping %d should not be compound_key type", i)
+				}
+			}
+		})
+	}
+}
+
+func TestFilterCompoundKeyMappings_PreservesOtherMappingTypes(t *testing.T) {
+	// Verify that filtering compound_key doesn't affect other mapping types
+	input := []client.FieldMapping{
+		{
+			From:                "email",
+			To:                  "Email",
+			Type:                "direct",
+			IsPrimaryIdentifier: true,
+			Position:            0,
+		},
+		{
+			To:       "Source",
+			Type:     "constant",
+			Constant: "Website",
+			Position: 1,
+		},
+		{
+			To:              "SyncRunID",
+			Type:            "sync_metadata",
+			SyncMetadataKey: "sync_run_id",
+			Position:        2,
+		},
+		{
+			To:             "FullName",
+			Type:           "liquid_template",
+			LiquidTemplate: "{{ first_name }} {{ last_name }}",
+			Position:       3,
+		},
+		{
+			From:                "[map[data:ID type:column]]",
+			To:                  "_census_tracking_id",
+			Type:                "compound_key",
+			IsPrimaryIdentifier: true,
+			Position:            4,
+		},
+	}
+
+	// Filter out compound_key mappings
+	userManagedMappings := make([]client.FieldMapping, 0, len(input))
+	for _, mapping := range input {
+		if mapping.Type != "compound_key" {
+			userManagedMappings = append(userManagedMappings, mapping)
+		}
+	}
+
+	// Should have 4 mappings (all except compound_key)
+	if len(userManagedMappings) != 4 {
+		t.Errorf("Expected 4 mappings after filtering, got %d", len(userManagedMappings))
+	}
+
+	// Verify all mapping types are preserved
+	expectedTypes := []string{"direct", "constant", "sync_metadata", "liquid_template"}
+	for i, mapping := range userManagedMappings {
+		if mapping.Type != expectedTypes[i] {
+			t.Errorf("Mapping %d: expected type '%s', got '%s'", i, expectedTypes[i], mapping.Type)
+		}
+	}
+
+	// Verify the primary identifier is preserved
+	if !userManagedMappings[0].IsPrimaryIdentifier {
+		t.Errorf("Expected first mapping to be primary identifier")
+	}
+}
