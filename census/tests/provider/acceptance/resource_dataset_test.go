@@ -356,7 +356,7 @@ func testAccDatasetImportStateIdFunc(resourceName string) resource.ImportStateId
 	}
 }
 
-// create a basic dataset with metadata refresh 
+// create a basic dataset with metadata refresh
 func TestAccResourceDataset_WithMetadataRefreshWait(t *testing.T) {
 	resource.Test(t, resource.TestCase{
 		PreCheck:  func() { provider_test.TestAccPreCheckIntegration(t) },
@@ -476,7 +476,6 @@ resource "census_dataset" "test_with_wait" {
 		os.Getenv("CENSUS_TEST_REDSHIFT_PASSWORD"),
 	)
 }
-
 
 func testAccResourceDatasetConfig_withSyncAfterWait() string {
 	return fmt.Sprintf(`
