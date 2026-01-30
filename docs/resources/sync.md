@@ -462,6 +462,74 @@ resource "census_sync" "user_list_sync" {
 }
 ```
 
+### Google Ads Sync with Compound Keys
+
+When syncing to Google Ads destinations with compound keys (like Click Conversions), Census automatically generates a compound key mapping for the primary identifier. This Census-managed mapping should **NOT** be defined in your Terraform configuration, as it is filtered out automatically to prevent drift.
+
+```hcl
+resource "census_sync" "google_ads_click_conversion" {
+  workspace_id = census_workspace.main.id
+  label        = "Google Ads Click Conversion Sync"
+
+  source_attributes {
+    connection_id = census_source.warehouse.id
+    object {
+      type = "dataset"
+      id   = census_dataset.conversion_data.id
+    }
+  }
+
+  destination_attributes {
+    connection_id = census_destination.google_ads.id
+    object        = "click_conversion_with_compound_key"
+  }
+
+  operation = "upsert"
+
+  # IMPORTANT: Only define your user-managed field mappings here
+  # Census will auto-generate a compound_key mapping for the primary identifier
+  # (e.g., click_conversion._census_tracking_id)
+  # Do NOT define this mapping - it will be filtered out automatically
+
+  field_mapping {
+    from = "conversion_timestamp"
+    to   = "click_conversion.conversion_date_time"
+  }
+
+  field_mapping {
+    from = "click_id"
+    to   = "click_conversion.gclid"
+  }
+
+  field_mapping {
+    from = "conversion_action_id"
+    to   = "click_conversion.conversion_action"
+    # Lookup configuration for foreign key relationship
+    lookup_object = "conversion_action"
+    lookup_field  = "id"
+  }
+
+  run_mode {
+    type = "triggered"
+    triggers {
+      schedule {
+        frequency = "daily"
+        hour      = 8
+        minute    = 0
+      }
+    }
+  }
+
+  paused = true
+}
+```
+
+**Key Points:**
+- Census auto-generates a `compound_key` type mapping for destinations with compound primary identifiers
+- This mapping is entirely managed by Census and cannot be modified by users
+- The Terraform provider automatically filters out this mapping during reads to prevent drift
+- You only need to define your user-managed field mappings in the configuration
+
 ### Sync with Advanced Configuration (File Export)
 
 ```hcl
@@ -900,3 +968,4 @@ terraform import census_sync.user_sync "12345:67890"
 * Source types determine which fields are required in `source_attributes.object`.
   * For segment sources, use `type="segment"` with `id` (segment ID) and `dataset_id` (parent dataset ID)
   * For cohort sources, use `type="cohort"` with `id` (cohort ID) and `dataset_id` (parent dataset ID)
+* **Compound Key Mappings (Google Ads, etc.)**: Some destinations (like Google Ads Click Conversions) require compound keys for primary identifiers. Census automatically generates these mappings and they should NOT be included in your Terraform configuration. The provider automatically filters out Census-managed compound_key mappings to prevent drift. See the "Google Ads Sync with Compound Keys" example above.

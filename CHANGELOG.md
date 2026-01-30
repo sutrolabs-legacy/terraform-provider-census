@@ -5,7 +5,17 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [0.2.9] - 2025-01-06
+## [0.2.10] - Unreleased
+
+### Fixed
+- **Compound Key Mapping Drift**: Fixed drift detection for syncs to destinations that use Census-managed compound keys (e.g., Google Ads Click Conversions). For certain destinations, Census automatically generates a `compound_key` type mapping for the primary identifier, which users cannot create or modify. The provider now:
+  - Automatically filters out Census-managed `compound_key` mappings during sync reads
+  - Prevents spurious drift warnings about unexpected mappings (e.g., `click_conversion._census_tracking_id`)
+  - Users only need to define their own field mappings - Census-managed compound keys are handled transparently
+  - Added comprehensive test coverage for compound key filtering logic
+  - Added documentation example demonstrating Google Ads sync configuration with compound keys
+
+## [0.2.9] - 2026-01-06
 
 ### Fixed
 - **Alert Management**: Fixed alert lifecycle management to follow Terraform best practices. Previously, the provider would omit the `alert_attributes` field when no alerts were configured, causing the Census API to add default alerts on create and preserve existing alerts on update. The provider now always sends `alert_attributes` (as an empty array when no alerts are configured), ensuring:
