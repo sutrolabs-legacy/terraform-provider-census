@@ -401,7 +401,7 @@ func TestAccResourceDataset_WithoutMetadataRefreshWait(t *testing.T) {
 					resource.TestCheckResourceAttr("census_dataset.test", "name", "Test Active Users Dataset"),
 					resource.TestCheckResourceAttr("census_dataset.test", "wait_for_metadata_refresh", "false"),
 					resource.TestCheckResourceAttrSet("census_dataset.test", "id"),
-					// Note: metadata_ready might be false or true depending on background refresh timing
+					resource.TestCheckResourceAttr("census_dataset.test", "metadata_ready", "false"),
 				),
 			},
 		},
@@ -634,7 +634,6 @@ func TestAccResourceDataset_UpdateMetadataRefreshFalseToTrue(t *testing.T) {
 		},
 	})
 }
-
 
 func TestAccResourceDataset_UpdateMetadataRefreshStaysFalse(t *testing.T) {
 	resource.Test(t, resource.TestCase{
