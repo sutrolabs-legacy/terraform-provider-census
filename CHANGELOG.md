@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [0.2.10] - Unreleased
 
+### Added
+- **Dataset Metadata Refresh**: Added `wait_for_metadata_refresh` attribute to `census_dataset` resource. When set to `true`, the provider waits for column metadata to be fetched before returning. This is useful when sync creation timeouts due to long dataset query times. 
+
 ### Fixed
 - **Compound Key Mapping Drift**: Fixed drift detection for syncs to destinations that use Census-managed compound keys (e.g., Google Ads Click Conversions). For certain destinations, Census automatically generates a `compound_key` type mapping for the primary identifier, which users cannot create or modify. The provider now:
   - Automatically filters out Census-managed `compound_key` mappings during sync reads
