@@ -83,7 +83,6 @@ func testAccResourceDatasetConfig_basic() string {
 	return fmt.Sprintf(`
 resource "census_workspace" "test" {
   name = "Test Workspace - Dataset"
-  notification_emails = ["test@example.com"]
 }
 
 resource "census_source" "test" {
@@ -133,7 +132,6 @@ func testAccResourceDatasetConfig_updated() string {
 	return fmt.Sprintf(`
 resource "census_workspace" "test" {
   name = "Test Workspace - Dataset"
-  notification_emails = ["test@example.com"]
 }
 
 resource "census_source" "test" {
@@ -184,7 +182,6 @@ func testAccResourceDatasetConfig_withSync() string {
 	return fmt.Sprintf(`
 resource "census_workspace" "test" {
   name = "Test Workspace - Dataset Sync"
-  notification_emails = ["test@example.com"]
 }
 
 resource "census_source" "test" {
@@ -334,6 +331,9 @@ func TestAccResourceDataset_Import(t *testing.T) {
 				ImportState:       true,
 				ImportStateVerify: true,
 				ImportStateIdFunc: testAccDatasetImportStateIdFunc("census_dataset.test"),
+				ImportStateVerifyIgnore: []string{
+					"wait_for_metadata_refresh", // Optional field with default, not persisted in state after creation
+				},
 			},
 		},
 	})
@@ -351,4 +351,435 @@ func testAccDatasetImportStateIdFunc(resourceName string) resource.ImportStateId
 			rs.Primary.Attributes["workspace_id"],
 			rs.Primary.ID), nil
 	}
+}
+
+// create a basic dataset with metadata refresh
+func TestAccResourceDataset_WithMetadataRefreshWait(t *testing.T) {
+	resource.Test(t, resource.TestCase{
+		PreCheck:  func() { provider_test.TestAccPreCheckIntegration(t) },
+		Providers: provider_test.TestAccProviders,
+		Steps: []resource.TestStep{
+			{
+				Config: testAccResourceDatasetConfig_withMetadataWait(),
+				Check: resource.ComposeTestCheckFunc(
+					resource.TestCheckResourceAttr("census_dataset.test_with_wait", "name", "Test Dataset With Metadata Wait"),
+					resource.TestCheckResourceAttr("census_dataset.test_with_wait", "wait_for_metadata_refresh", "true"),
+					resource.TestCheckResourceAttr("census_dataset.test_with_wait", "metadata_ready", "true"),
+					resource.TestCheckResourceAttrSet("census_dataset.test_with_wait", "columns.#"),
+					// Verify columns were populated
+					func(s *terraform.State) error {
+						rs, ok := s.RootModule().Resources["census_dataset.test_with_wait"]
+						if !ok {
+							return fmt.Errorf("Not found: census_dataset.test_with_wait")
+						}
+
+						columnsCount := rs.Primary.Attributes["columns.#"]
+						if columnsCount == "0" || columnsCount == "" {
+							return fmt.Errorf("Expected columns to be populated, but got: %s", columnsCount)
+						}
+
+						return nil
+					},
+				),
+			},
+		},
+	})
+}
+
+// create a basic dataset without waiting for metadata refresh, this is the default behavior, but just an explicit test for this
+func TestAccResourceDataset_WithoutMetadataRefreshWait(t *testing.T) {
+	resource.Test(t, resource.TestCase{
+		PreCheck:  func() { provider_test.TestAccPreCheckIntegration(t) },
+		Providers: provider_test.TestAccProviders,
+		Steps: []resource.TestStep{
+			{
+				Config: testAccResourceDatasetConfig_basic(),
+				Check: resource.ComposeTestCheckFunc(
+					resource.TestCheckResourceAttr("census_dataset.test", "name", "Test Active Users Dataset"),
+					resource.TestCheckResourceAttr("census_dataset.test", "wait_for_metadata_refresh", "false"),
+					resource.TestCheckResourceAttrSet("census_dataset.test", "id"),
+					resource.TestCheckResourceAttr("census_dataset.test", "metadata_ready", "false"),
+				),
+			},
+		},
+	})
+}
+
+// create a dataset and a dependent sync in one plan (waits for metadata)
+func TestAccResourceDataset_SyncAfterMetadataWait(t *testing.T) {
+	resource.Test(t, resource.TestCase{
+		PreCheck:  func() { provider_test.TestAccPreCheckIntegration(t) },
+		Providers: provider_test.TestAccProviders,
+		Steps: []resource.TestStep{
+			{
+				Config: testAccResourceDatasetConfig_withSyncAfterWait(),
+				Check: resource.ComposeTestCheckFunc(
+					resource.TestCheckResourceAttr("census_dataset.test_for_sync", "wait_for_metadata_refresh", "true"),
+					resource.TestCheckResourceAttr("census_dataset.test_for_sync", "metadata_ready", "true"),
+					resource.TestCheckResourceAttr("census_sync.test_sync", "label", "Test Sync After Dataset Wait"),
+					resource.TestCheckResourceAttrSet("census_sync.test_sync", "id"),
+				),
+			},
+		},
+	})
+}
+
+func testAccResourceDatasetConfig_withMetadataWait() string {
+	return fmt.Sprintf(`
+resource "census_workspace" "test" {
+  name = "Test Workspace - Dataset Metadata Wait"
+}
+
+resource "census_source" "test" {
+  workspace_id = census_workspace.test.id
+  name = "Test Redshift Source - Metadata Wait"
+  type = "redshift"
+
+  connection_config = {
+    hostname = "%s"
+    port     = "%s"
+    database = "%s"
+    user     = "%s"
+    password = "%s"
+  }
+
+  auto_refresh_tables = false
+}
+
+resource "census_dataset" "test_with_wait" {
+  workspace_id = census_workspace.test.id
+  name         = "Test Dataset With Metadata Wait"
+  type         = "sql"
+  description  = "Testing metadata refresh wait"
+  source_id    = census_source.test.id
+
+  query = <<-SQL
+    SELECT
+      user_id,
+      email,
+      first_name,
+      last_name
+    FROM users
+  SQL
+
+  wait_for_metadata_refresh = true
+}
+`,
+		os.Getenv("CENSUS_TEST_REDSHIFT_HOST"),
+		os.Getenv("CENSUS_TEST_REDSHIFT_PORT"),
+		os.Getenv("CENSUS_TEST_REDSHIFT_DATABASE"),
+		os.Getenv("CENSUS_TEST_REDSHIFT_USERNAME"),
+		os.Getenv("CENSUS_TEST_REDSHIFT_PASSWORD"),
+	)
+}
+
+func testAccResourceDatasetConfig_withSyncAfterWait() string {
+	return fmt.Sprintf(`
+resource "census_workspace" "test" {
+  name = "Test Workspace - Sync After Wait"
+}
+
+resource "census_source" "test" {
+  workspace_id = census_workspace.test.id
+  name = "Test Redshift Source - Sync"
+  type = "redshift"
+
+  connection_config = {
+    hostname = "%s"
+    port     = "%s"
+    database = "%s"
+    user     = "%s"
+    password = "%s"
+  }
+
+  auto_refresh_tables = false
+}
+
+resource "census_destination" "test" {
+  workspace_id = census_workspace.test.id
+  name = "Test Salesforce Destination"
+  type = "salesforce"
+
+  connection_config = {
+    username      = "%s"
+    instance_url  = "%s"
+    client_id     = "%s"
+    jwt_signing_key   = "%s"
+    domain        = "%s"
+  }
+}
+
+resource "census_dataset" "test_for_sync" {
+  workspace_id = census_workspace.test.id
+  name         = "Test Dataset For Sync"
+  type         = "sql"
+  source_id    = census_source.test.id
+
+  query = <<-SQL
+    SELECT
+      user_id,
+      email,
+      first_name,
+      last_name
+    FROM users
+  SQL
+
+  wait_for_metadata_refresh = true
+}
+
+resource "census_sync" "test_sync" {
+  workspace_id = census_workspace.test.id
+  label        = "Test Sync After Dataset Wait"
+
+  source_attributes {
+    connection_id = census_source.test.id
+    object {
+      type = "dataset"
+      id   = census_dataset.test_for_sync.id
+    }
+  }
+
+  destination_attributes {
+    connection_id = census_destination.test.id
+    object        = "Contact"
+  }
+
+  operation = "upsert"
+
+  field_mapping {
+    from                  = "email"
+    to                    = "Email"
+    is_primary_identifier = true
+  }
+
+  field_mapping {
+    from = "first_name"
+    to   = "FirstName"
+  }
+
+  field_mapping {
+    from = "last_name"
+    to   = "LastName"
+  }
+
+  field_mapping {
+    from = "user_id"
+    to   = "Census_ID__c"
+  }
+
+  run_mode {
+    type = "triggered"
+    triggers {
+      schedule {
+        frequency = "never"
+      }
+    }
+  }
+
+  paused = true
+}
+`,
+		os.Getenv("CENSUS_TEST_REDSHIFT_HOST"),
+		os.Getenv("CENSUS_TEST_REDSHIFT_PORT"),
+		os.Getenv("CENSUS_TEST_REDSHIFT_DATABASE"),
+		os.Getenv("CENSUS_TEST_REDSHIFT_USERNAME"),
+		os.Getenv("CENSUS_TEST_REDSHIFT_PASSWORD"),
+		os.Getenv("CENSUS_TEST_SALESFORCE_USERNAME"),
+		os.Getenv("CENSUS_TEST_SALESFORCE_INSTANCE_URL"),
+		os.Getenv("CENSUS_TEST_SALESFORCE_CLIENT_ID"),
+		os.Getenv("CENSUS_TEST_SALESFORCE_JWT_SIGNING_KEY"),
+		os.Getenv("CENSUS_TEST_SALESFORCE_DOMAIN"),
+	)
+}
+
+func TestAccResourceDataset_UpdateMetadataRefreshFalseToTrue(t *testing.T) {
+	resource.Test(t, resource.TestCase{
+		PreCheck:  func() { provider_test.TestAccPreCheckIntegration(t) },
+		Providers: provider_test.TestAccProviders,
+		Steps: []resource.TestStep{
+			{
+				Config: testAccResourceDatasetConfig_metadataRefreshUpdate("Test Dataset Update Refresh", false),
+				Check: resource.ComposeTestCheckFunc(
+					resource.TestCheckResourceAttr("census_dataset.test_update", "name", "Test Dataset Update Refresh"),
+					resource.TestCheckResourceAttr("census_dataset.test_update", "wait_for_metadata_refresh", "false"),
+					resource.TestCheckResourceAttr("census_dataset.test_update", "metadata_ready", "false"),
+				),
+			},
+			{
+				Config: testAccResourceDatasetConfig_metadataRefreshUpdate("Test Dataset Update Refresh", true),
+				Check: resource.ComposeTestCheckFunc(
+					resource.TestCheckResourceAttr("census_dataset.test_update", "wait_for_metadata_refresh", "true"),
+					resource.TestCheckResourceAttr("census_dataset.test_update", "metadata_ready", "true"),
+					resource.TestCheckResourceAttrSet("census_dataset.test_update", "columns.#"),
+					func(s *terraform.State) error {
+						rs, ok := s.RootModule().Resources["census_dataset.test_update"]
+						if !ok {
+							return fmt.Errorf("Not found: census_dataset.test_update")
+						}
+
+						columnsCount := rs.Primary.Attributes["columns.#"]
+						if columnsCount == "0" || columnsCount == "" {
+							return fmt.Errorf("Expected columns to be populated after enabling wait_for_metadata_refresh, but got: %s", columnsCount)
+						}
+
+						return nil
+					},
+				),
+			},
+		},
+	})
+}
+
+func TestAccResourceDataset_UpdateMetadataRefreshStaysFalse(t *testing.T) {
+	resource.Test(t, resource.TestCase{
+		PreCheck:  func() { provider_test.TestAccPreCheckIntegration(t) },
+		Providers: provider_test.TestAccProviders,
+		Steps: []resource.TestStep{
+			{
+				Config: testAccResourceDatasetConfig_metadataRefreshUpdate("Test Dataset No Refresh", false),
+				Check: resource.ComposeTestCheckFunc(
+					resource.TestCheckResourceAttr("census_dataset.test_update", "name", "Test Dataset No Refresh"),
+					resource.TestCheckResourceAttr("census_dataset.test_update", "wait_for_metadata_refresh", "false"),
+					resource.TestCheckResourceAttr("census_dataset.test_update", "metadata_ready", "false"),
+				),
+			},
+			{
+				Config: testAccResourceDatasetConfig_metadataRefreshUpdateWithDescription("Test Dataset No Refresh", "Updated description", false),
+				Check: resource.ComposeTestCheckFunc(
+					resource.TestCheckResourceAttr("census_dataset.test_update", "description", "Updated description"),
+					resource.TestCheckResourceAttr("census_dataset.test_update", "wait_for_metadata_refresh", "false"),
+					resource.TestCheckResourceAttr("census_dataset.test_update", "metadata_ready", "false"),
+				),
+			},
+		},
+	})
+}
+
+// TestAccResourceDataset_UpdateFieldsWithoutMetadataRefreshChange tests normal updates don't trigger refresh
+func TestAccResourceDataset_UpdateFieldsWithoutMetadataRefreshChange(t *testing.T) {
+	resource.Test(t, resource.TestCase{
+		PreCheck:  func() { provider_test.TestAccPreCheckIntegration(t) },
+		Providers: provider_test.TestAccProviders,
+		Steps: []resource.TestStep{
+			{
+				Config: testAccResourceDatasetConfig_metadataRefreshUpdate("Original Name", false),
+				Check: resource.ComposeTestCheckFunc(
+					resource.TestCheckResourceAttr("census_dataset.test_update", "name", "Original Name"),
+					resource.TestCheckResourceAttr("census_dataset.test_update", "wait_for_metadata_refresh", "false"),
+					resource.TestCheckResourceAttr("census_dataset.test_update", "metadata_ready", "false"),
+				),
+			},
+			{
+				Config: testAccResourceDatasetConfig_metadataRefreshUpdateWithDescription("Updated Name", "New description", false),
+				Check: resource.ComposeTestCheckFunc(
+					resource.TestCheckResourceAttr("census_dataset.test_update", "name", "Updated Name"),
+					resource.TestCheckResourceAttr("census_dataset.test_update", "description", "New description"),
+					resource.TestCheckResourceAttr("census_dataset.test_update", "wait_for_metadata_refresh", "false"),
+					resource.TestCheckResourceAttr("census_dataset.test_update", "metadata_ready", "false"),
+				),
+			},
+		},
+	})
+}
+
+func testAccResourceDatasetConfig_metadataRefreshUpdate(name string, waitForMetadata bool) string {
+	return fmt.Sprintf(`
+resource "census_workspace" "test" {
+  name = "Test Workspace - Dataset Metadata Update"
+}
+
+resource "census_source" "test" {
+  workspace_id = census_workspace.test.id
+  name = "Test Redshift Source - Update"
+  type = "redshift"
+
+  connection_config = {
+    hostname = "%s"
+    port     = "%s"
+    database = "%s"
+    user     = "%s"
+    password = "%s"
+  }
+
+  auto_refresh_tables = false
+}
+
+resource "census_dataset" "test_update" {
+  workspace_id = census_workspace.test.id
+  name         = "%s"
+  type         = "sql"
+  source_id    = census_source.test.id
+
+  query = <<-SQL
+    SELECT
+      user_id,
+      email,
+      first_name,
+      last_name
+    FROM users
+  SQL
+
+  wait_for_metadata_refresh = %t
+}
+`,
+		os.Getenv("CENSUS_TEST_REDSHIFT_HOST"),
+		getEnvOrDefault("CENSUS_TEST_REDSHIFT_PORT", "5439"),
+		os.Getenv("CENSUS_TEST_REDSHIFT_DATABASE"),
+		os.Getenv("CENSUS_TEST_REDSHIFT_USERNAME"),
+		os.Getenv("CENSUS_TEST_REDSHIFT_PASSWORD"),
+		name,
+		waitForMetadata,
+	)
+}
+
+func testAccResourceDatasetConfig_metadataRefreshUpdateWithDescription(name string, description string, waitForMetadata bool) string {
+	return fmt.Sprintf(`
+resource "census_workspace" "test" {
+  name = "Test Workspace - Dataset Metadata Update"
+}
+
+resource "census_source" "test" {
+  workspace_id = census_workspace.test.id
+  name = "Test Redshift Source - Update"
+  type = "redshift"
+
+  connection_config = {
+    hostname = "%s"
+    port     = "%s"
+    database = "%s"
+    user     = "%s"
+    password = "%s"
+  }
+
+  auto_refresh_tables = false
+}
+
+resource "census_dataset" "test_update" {
+  workspace_id = census_workspace.test.id
+  name         = "%s"
+  description  = "%s"
+  type         = "sql"
+  source_id    = census_source.test.id
+
+  query = <<-SQL
+    SELECT
+      user_id,
+      email,
+      first_name,
+      last_name
+    FROM users
+  SQL
+
+  wait_for_metadata_refresh = %t
+}
+`,
+		os.Getenv("CENSUS_TEST_REDSHIFT_HOST"),
+		getEnvOrDefault("CENSUS_TEST_REDSHIFT_PORT", "5439"),
+		os.Getenv("CENSUS_TEST_REDSHIFT_DATABASE"),
+		os.Getenv("CENSUS_TEST_REDSHIFT_USERNAME"),
+		os.Getenv("CENSUS_TEST_REDSHIFT_PASSWORD"),
+		name,
+		description,
+		waitForMetadata,
+	)
 }

@@ -33,7 +33,6 @@ func testAccDataSourceSourceConfig_basic() string {
 	return fmt.Sprintf(`
 resource "census_workspace" "test" {
   name = "Test Workspace - Data Source"
-  notification_emails = ["test@example.com"]
 }
 
 resource "census_source" "test" {

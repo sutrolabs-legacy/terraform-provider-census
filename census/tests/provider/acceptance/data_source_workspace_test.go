@@ -44,7 +44,6 @@ func testAccDataSourceWorkspaceConfig_basic() string {
 	return `
 resource "census_workspace" "test" {
   name = "Test Workspace - Data Source"
-  notification_emails = ["test@example.com"]
 }
 
 data "census_workspace" "test" {
