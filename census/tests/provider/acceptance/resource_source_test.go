@@ -56,7 +56,6 @@ func testAccResourceSourceConfig_redshift() string {
 	return fmt.Sprintf(`
 resource "census_workspace" "test" {
   name = "Test Workspace - Source"
-  notification_emails = ["test@example.com"]
 }
 
 resource "census_source" "test" {
@@ -87,7 +86,6 @@ func testAccResourceSourceConfig_redshiftUpdated() string {
 	return fmt.Sprintf(`
 resource "census_workspace" "test" {
   name = "Test Workspace - Source"
-  notification_emails = ["test@example.com"]
 }
 
 resource "census_source" "test" {

@@ -163,7 +163,6 @@ func testAccIntegrationBaseConfig() string {
 	return fmt.Sprintf(`
 resource "census_workspace" "test" {
   name = "Test Workspace - Sync Integration"
-  notification_emails = ["test@example.com"]
 }
 
 resource "census_source" "test" {

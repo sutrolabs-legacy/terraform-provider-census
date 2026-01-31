@@ -83,7 +83,6 @@ func testAccResourceDatasetConfig_basic() string {
 	return fmt.Sprintf(`
 resource "census_workspace" "test" {
   name = "Test Workspace - Dataset"
-  notification_emails = ["test@example.com"]
 }
 
 resource "census_source" "test" {
@@ -133,7 +132,6 @@ func testAccResourceDatasetConfig_updated() string {
 	return fmt.Sprintf(`
 resource "census_workspace" "test" {
   name = "Test Workspace - Dataset"
-  notification_emails = ["test@example.com"]
 }
 
 resource "census_source" "test" {
@@ -184,7 +182,6 @@ func testAccResourceDatasetConfig_withSync() string {
 	return fmt.Sprintf(`
 resource "census_workspace" "test" {
   name = "Test Workspace - Dataset Sync"
-  notification_emails = ["test@example.com"]
 }
 
 resource "census_source" "test" {
@@ -431,7 +428,6 @@ func testAccResourceDatasetConfig_withMetadataWait() string {
 	return fmt.Sprintf(`
 resource "census_workspace" "test" {
   name = "Test Workspace - Dataset Metadata Wait"
-  notification_emails = ["test@example.com"]
 }
 
 resource "census_source" "test" {
@@ -481,7 +477,6 @@ func testAccResourceDatasetConfig_withSyncAfterWait() string {
 	return fmt.Sprintf(`
 resource "census_workspace" "test" {
   name = "Test Workspace - Sync After Wait"
-  notification_emails = ["test@example.com"]
 }
 
 resource "census_source" "test" {
@@ -691,7 +686,6 @@ func testAccResourceDatasetConfig_metadataRefreshUpdate(name string, waitForMeta
 	return fmt.Sprintf(`
 resource "census_workspace" "test" {
   name = "Test Workspace - Dataset Metadata Update"
-  notification_emails = ["test@example.com"]
 }
 
 resource "census_source" "test" {
@@ -742,7 +736,6 @@ func testAccResourceDatasetConfig_metadataRefreshUpdateWithDescription(name stri
 	return fmt.Sprintf(`
 resource "census_workspace" "test" {
   name = "Test Workspace - Dataset Metadata Update"
-  notification_emails = ["test@example.com"]
 }
 
 resource "census_source" "test" {

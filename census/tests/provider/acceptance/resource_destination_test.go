@@ -56,7 +56,6 @@ func testAccResourceDestinationConfig_salesforce() string {
 	return fmt.Sprintf(`
 resource "census_workspace" "test" {
   name = "Test Workspace - Destination"
-  notification_emails = ["test@example.com"]
 }
 
 resource "census_destination" "test" {
@@ -87,7 +86,6 @@ func testAccResourceDestinationConfig_salesforceUpdated() string {
 	return fmt.Sprintf(`
 resource "census_workspace" "test" {
   name = "Test Workspace - Destination"
-  notification_emails = ["test@example.com"]
 }
 
 resource "census_destination" "test" {
