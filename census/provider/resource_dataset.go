@@ -122,6 +122,68 @@ func resourceDataset() *schema.Resource {
 	}
 }
 
+func waitForMetadataRefresh(ctx context.Context, apiClient *client.Client, datasetID int, workspaceToken string) diag.Diagnostics {
+	refreshKey, err := apiClient.RefreshDatasetColumnsWithToken(ctx, datasetID, workspaceToken)
+	if err != nil {
+		return diag.Diagnostics{
+			diag.Diagnostic{
+				Severity: diag.Error,
+				Summary:  "Failed to trigger metadata refresh",
+				Detail: fmt.Sprintf(
+					"Dataset %d exists, but metadata refresh could not be triggered: %v\n\n"+
+						"To resolve:\n"+
+						"1. Run 'terraform apply' again to retry metadata refresh\n"+
+						"2. Or remove 'wait_for_metadata_refresh = true' and manually trigger metadata refresh in the Census UI or API\n",
+					datasetID, err),
+			},
+		}
+	}
+
+	// Poll until metadata refresh completes using StateChangeConf
+	// Possible statuses: "processing" (pending), "completed" (success), "error" (failure)
+	stateConf := &retry.StateChangeConf{
+		Pending: []string{"processing"},
+		Target:  []string{"completed"},
+		Refresh: func() (interface{}, string, error) {
+			statusResp, err := apiClient.GetDatasetRefreshStatusWithToken(ctx, datasetID, refreshKey, workspaceToken)
+			if err != nil {
+				return nil, "", fmt.Errorf("metadata refresh failed: %w", err)
+			}
+
+			if statusResp.Status == "error" {
+				errMsg := "unknown error"
+				if statusResp.Message != nil {
+					errMsg = *statusResp.Message
+				}
+				return nil, "", fmt.Errorf("metadata refresh failed: %s", errMsg)
+			}
+
+			return statusResp, statusResp.Status, nil
+		},
+		Timeout:    30 * time.Minute, // Default 30 minutes
+		Delay:      5 * time.Second,  // Wait 5 seconds before first poll
+		MinTimeout: 3 * time.Second,  // Minimum 3 seconds between polls
+	}
+
+	_, err = stateConf.WaitForStateContext(ctx)
+	if err != nil {
+		return diag.Diagnostics{
+			diag.Diagnostic{
+				Severity: diag.Error,
+				Summary:  "Metadata refresh did not complete in time",
+				Detail: fmt.Sprintf(
+					"Dataset %d metadata refresh did not complete: %v\n\n"+
+						"To resolve:\n"+
+						"1. Run 'terraform apply' again to wait for metadata refresh to complete\n"+
+						"2. Check metadata refresh status in the Census UI\n",
+					datasetID, err),
+			},
+		}
+	}
+
+	return nil
+}
+
 func resourceDatasetCreate(ctx context.Context, d *schema.ResourceData, meta interface{}) diag.Diagnostics {
 	apiClient := meta.(*client.Client)
 
@@ -167,66 +229,8 @@ func resourceDatasetCreate(ctx context.Context, d *schema.ResourceData, meta int
 	d.Set("workspace_id", workspaceId)
 
 	if d.Get("wait_for_metadata_refresh").(bool) {
-		refreshKey, err := apiClient.RefreshDatasetColumnsWithToken(ctx, dataset.ID, workspaceToken)
-		if err != nil {
-			return diag.Diagnostics{
-				diag.Diagnostic{
-					Severity: diag.Error,
-					Summary:  "Failed to trigger metadata refresh",
-					Detail: fmt.Sprintf(
-						"Dataset %d was successfully created in Census, but metadata refresh could not be triggered: %v\n\n"+
-							"The dataset exists in Census (ID: %d) and is tracked in Terraform state.\n"+
-							"Creating syncs from this dataset might timeout until metadata is explicitly fetched.\n\n"+
-							"To resolve:\n"+
-							"1. Run 'terraform apply' again to retry metadata refresh\n"+
-							"2. Or remove 'wait_for_metadata_refresh = true' and manually trigger metadata refresh in the Census UI or API\n",
-						dataset.ID, err, dataset.ID),
-				},
-			}
-		}
-
-		// Poll until metadata refresh completes using StateChangeConf
-		// Possible statuses: "processing" (pending), "completed" (success), "error" (failure)
-		createStateConf := &retry.StateChangeConf{
-			Pending: []string{"processing"},
-			Target:  []string{"completed"},
-			Refresh: func() (interface{}, string, error) {
-				statusResp, err := apiClient.GetDatasetRefreshStatusWithToken(ctx, dataset.ID, refreshKey, workspaceToken)
-				if err != nil {
-					return nil, "", fmt.Errorf("metadata refresh failed: %w", err)
-				}
-
-				if statusResp.Status == "error" {
-					errMsg := "unknown error"
-					if statusResp.Message != nil {
-						errMsg = *statusResp.Message
-					}
-					return nil, "", fmt.Errorf("metadata refresh failed: %s", errMsg)
-				}
-
-				return statusResp, statusResp.Status, nil
-			},
-			Timeout:    30 * time.Minute, // Default 30 minutes
-			Delay:      5 * time.Second,  // Wait 5 seconds before first poll
-			MinTimeout: 3 * time.Second,  // Minimum 3 seconds between polls
-		}
-
-		_, err = createStateConf.WaitForStateContext(ctx)
-		if err != nil {
-			return diag.Diagnostics{
-				diag.Diagnostic{
-					Severity: diag.Error,
-					Summary:  "Metadata refresh did not complete in time",
-					Detail: fmt.Sprintf(
-						"Dataset %d was successfully created in Census, but metadata refresh did not complete: %v\n\n"+
-							"The dataset exists in Census (ID: %d) and is tracked in Terraform state.\n"+
-							"Creating syncs from this dataset might timeout until metadata is available.\n\n"+
-							"To resolve:\n"+
-							"1. Run 'terraform apply' again to wait for metadata refresh to complete\n"+
-							"2. Check metadata refresh status in the Census UI\n",
-						dataset.ID, err, dataset.ID),
-				},
-			}
+		if diags := waitForMetadataRefresh(ctx, apiClient, dataset.ID, workspaceToken); diags != nil {
+			return diags
 		}
 	}
 
@@ -379,65 +383,13 @@ func resourceDatasetUpdate(ctx context.Context, d *schema.ResourceData, meta int
 		}
 	}
 
-	// if wait_for_metadata_refresh changed from false to true and metadata isn't ready,
+	// If wait_for_metadata_refresh changed from false to true and metadata isn't ready,
 	// trigger the metadata refresh flow
 	if d.HasChange("wait_for_metadata_refresh") {
 		old, new := d.GetChange("wait_for_metadata_refresh")
 		if !old.(bool) && new.(bool) && !d.Get("metadata_ready").(bool) {
-			refreshKey, err := apiClient.RefreshDatasetColumnsWithToken(ctx, id, workspaceToken)
-			if err != nil {
-				return diag.Diagnostics{
-					diag.Diagnostic{
-						Severity: diag.Error,
-						Summary:  "Failed to trigger metadata refresh",
-						Detail: fmt.Sprintf(
-							"Dataset %d exists, but metadata refresh could not be triggered: %v\n\n"+
-								"To resolve:\n"+
-								"1. Run 'terraform apply' again to retry metadata refresh\n"+
-								"2. Or remove 'wait_for_metadata_refresh = true' and manually trigger metadata refresh in the Census UI or API\n",
-							id, err),
-					},
-				}
-			}
-
-			createStateConf := &retry.StateChangeConf{
-				Pending: []string{"processing"},
-				Target:  []string{"completed"},
-				Refresh: func() (interface{}, string, error) {
-					statusResp, err := apiClient.GetDatasetRefreshStatusWithToken(ctx, id, refreshKey, workspaceToken)
-					if err != nil {
-						return nil, "", fmt.Errorf("metadata refresh failed: %w", err)
-					}
-
-					if statusResp.Status == "error" {
-						errMsg := "unknown error"
-						if statusResp.Message != nil {
-							errMsg = *statusResp.Message
-						}
-						return nil, "", fmt.Errorf("metadata refresh failed: %s", errMsg)
-					}
-
-					return statusResp, statusResp.Status, nil
-				},
-				Timeout:    30 * time.Minute,
-				Delay:      5 * time.Second,
-				MinTimeout: 3 * time.Second,
-			}
-
-			_, err = createStateConf.WaitForStateContext(ctx)
-			if err != nil {
-				return diag.Diagnostics{
-					diag.Diagnostic{
-						Severity: diag.Error,
-						Summary:  "Metadata refresh did not complete in time",
-						Detail: fmt.Sprintf(
-							"Dataset %d metadata refresh did not complete: %v\n\n"+
-								"To resolve:\n"+
-								"1. Run 'terraform apply' again to wait for metadata refresh to complete\n"+
-								"2. Check metadata refresh status in the Census UI\n",
-							id, err),
-					},
-				}
+			if diags := waitForMetadataRefresh(ctx, apiClient, id, workspaceToken); diags != nil {
+				return diags
 			}
 		}
 	}
