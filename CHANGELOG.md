@@ -5,6 +5,11 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.2.11] - 2026-03-06
+
+### Changed
+- **Workspace Token Caching**: Workspace API keys are now cached in-memory for the duration of a Terraform run, eliminating redundant API calls to fetch the same workspace token before every resource operation. This significantly reduces API overhead when managing multiple resources in the same workspace.
+
 ## [0.2.10] - 2026-01-30
 
 ### Added
