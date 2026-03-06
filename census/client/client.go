@@ -10,6 +10,7 @@ import (
 	"net/http"
 	"net/url"
 	"strconv"
+	"sync"
 	"time"
 
 	"github.com/hashicorp/terraform-plugin-log/tflog"
@@ -37,6 +38,11 @@ type Config struct {
 type Client struct {
 	config     *Config
 	httpClient *http.Client
+
+	// workspaceTokenCache caches workspace API keys by workspace ID to avoid
+	// redundant API calls during a single Terraform run. Protected by tokenMu.
+	tokenMu             sync.RWMutex
+	workspaceTokenCache map[int]string
 }
 
 // NewClient creates a new Census API client
@@ -57,8 +63,9 @@ func NewClient(config *Config) (*Client, error) {
 	}
 
 	return &Client{
-		config:     config,
-		httpClient: httpClient,
+		config:              config,
+		httpClient:          httpClient,
+		workspaceTokenCache: make(map[int]string),
 	}, nil
 }
 

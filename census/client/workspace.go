@@ -151,9 +151,20 @@ type WorkspaceAPIKeyResponse struct {
 	APIKey string `json:"api_key"`
 }
 
-// GetWorkspaceAPIKey retrieves the API key for a specific workspace
-// Requires organization-level permissions (personal access token)
+// GetWorkspaceAPIKey retrieves the API key for a specific workspace.
+// Results are cached for the lifetime of the client to avoid redundant API calls
+// during a single Terraform run.
+// Requires organization-level permissions (personal access token).
 func (c *Client) GetWorkspaceAPIKey(ctx context.Context, workspaceID int) (string, error) {
+	// Check cache first (read lock)
+	c.tokenMu.RLock()
+	if token, ok := c.workspaceTokenCache[workspaceID]; ok {
+		c.tokenMu.RUnlock()
+		return token, nil
+	}
+	c.tokenMu.RUnlock()
+
+	// Cache miss — fetch from API
 	path := fmt.Sprintf("/workspaces/%d/api_key", workspaceID)
 	resp, err := c.makeRequest(ctx, http.MethodGet, path, nil, TokenTypePersonal)
 	if err != nil {
@@ -164,6 +175,11 @@ func (c *Client) GetWorkspaceAPIKey(ctx context.Context, workspaceID int) (strin
 	if err := c.handleResponse(resp, &result); err != nil {
 		return "", fmt.Errorf("failed to get workspace API key: %w", err)
 	}
+
+	// Store in cache (write lock)
+	c.tokenMu.Lock()
+	c.workspaceTokenCache[workspaceID] = result.APIKey
+	c.tokenMu.Unlock()
 
 	return result.APIKey, nil
 }
